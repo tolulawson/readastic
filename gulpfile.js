@@ -27,14 +27,19 @@ gulp.task('browserify', function() {
 gulp.task('sass', async function() {
   await promisifyStream(
     gulp.src('src/scss/*.scss')
-        .pipe(sass({ouputStyle: 'compressed'}).on('error', sass.logError))
+        .pipe(sass(
+          {
+            ouputStyle: 'compressed',
+          }).on('error', sass.logError))
         .pipe(gulp.dest('src/css'))
   )
 });
 
 gulp.task('start-sass', function() {
   return gulp.src('src/scss/*.scss')
-        .pipe(sass({ouputStyle: 'compressed'}).on('error', sass.logError))
+        .pipe(sass({
+          ouputStyle: 'compressed',
+      }).on('error', sass.logError))
         .pipe(gulp.dest('src/css'))
         // .pipe(browsersync.stream())
 });
@@ -109,10 +114,10 @@ gulp.task('start', async function() {
         baseDir : "src"
       }
   });
-  gulp.watch('src/scss/*.scss', {ignoreInitial: false}, gulp.series('start-sass', 'browserify')).on('change', browsersync.reload);
-  gulp.watch(['src/*.html', 'src/js/*.js']).on('change', browsersync.reload);
+  gulp.watch('src/scss/*.scss', {ignoreInitial: false}, gulp.series('start-sass')).on('change', browsersync.reload);
+  gulp.watch(['src/*.html', 'src/js/*.js', '!src/js/bundle.js'], {ignoreInitial: false},  gulp.series('browserify')).on('change', browsersync.reload);
 })
 
 gulp.task('build', async function() {
-  (gulp.series('sass', 'autoprefixer', 'cleancss', 'browserify', 'babel', 'uglify', 'htmlmin', 'image'))();
+  (gulp.series('sass', 'autoprefixer', 'cleancss', 'babel', 'browserify', 'uglify', 'htmlmin', 'image'))();
 });
