@@ -44,6 +44,8 @@
     "vinyl-source-stream": "^2.0.0"
   },
   "dependencies": {
+    "animate.css": "^4.1.0",
+    "aos": "^2.3.4",
     "bootstrap": "^4.5.0",
     "gulp-jasmine-browser": "^4.1.0",
     "jquery": "^3.5.1",
