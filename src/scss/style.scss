@@ -5,7 +5,8 @@ $menu-blue: #D9EEFD;
 $lora: 'lora', serif;
 $merriweather: 'Merriweather', serif;
 $gen-padding: 20px 8%;
-$gray: #707070;
+$gray: #777777;
+$timer-color: #97E5EF;
 
 * {
   box-sizing: border-box;
@@ -238,13 +239,14 @@ body {
         .feature-card {
           width: 28%;
           max-width: 300px;
-          min-width: 250px;
+          min-width: 200px;
           border-radius: 20px;
           display: flex;
           flex-direction: column;
+          justify-content: space-between;
           align-items: center;
           padding: 25px;
-          max-height: 400px;
+          min-height: 450px;
           margin: 35px 0;
 
           &:not(:first-child):not(:last-child) {
@@ -254,6 +256,7 @@ body {
           img {
             height: 40%;
             margin-bottom: 15px;
+            max-width: 100%;
           }
 
           h3 {
@@ -280,27 +283,89 @@ body {
             background: #fff;
             border: none;
             font-family: $merriweather;
-            font-weight: 600;
+            // font-weight: 600;
             font-size: 1rem;
             text-align: center;
             color: $gray;
 
           }
-      }
+
+          &#ranger {
+            background-color: #BBE1FA;
+          }
+
+          &#genie {
+            background-color: #E2F0B4
+          }
+
+          &#timer {
+            background-color: $timer-color;
+          }
+        }
 
 
       }
 
-      #ranger {
-        background-color: #BBE1FA;
+    }
+
+    .feature-section {
+      background: rgba(151, 229, 239, 0.38);
+      display: flex;
+      align-items: center;
+      flex-direction: column;
+      padding: 50px 0;
+      text-align: center;
+
+
+      .feature-logo {
+        display: flex;
+        flex-wrap: nowrap;
+        justify-content: center;
+        align-items: flex-end;
+        margin-bottom: 30px;
+
+        img {
+          width: 150px;
+        }
+
+        span {
+          font-family: $merriweather;
+          color: $dark-green;
+          font-size: 2.5rem;
+          margin-bottom: 25px;
+          margin-left:25px;
+          white-space: nowrap;
+        }
       }
 
-      #genie {
-        background-color: #E2F0B4
+      .feature-intro {
+        color: $gray;
+        font-family: $lora;
+        font-size: 1.5rem;
+        margin-bottom: 50px;
       }
 
-      #timer {
-        background-color: #97E5EF;
+      .script-input {
+        font-family: $lora;
+        font-size: 1rem;
+        max-width: 700px;
+        width: 90%;
+        height: 300px;
+        border: 1px solid #d1cece;
+        border-radius: 10px;
+        padding: 15px;
+        outline: none;
+        box-shadow: none;
+        resize: none;
+
+        &::placeholder {
+          text-align: center;
+          padding-top: 120px;
+          color: #A0A0A0;
+        }
+      }
+
+      &#script-timer {
       }
     }
 
@@ -318,6 +383,11 @@ body {
       a {
         text-decoration: none;
         color: inherit;
+      }
+
+      #coffee {
+        font-size: 1rem;
+        margin-top: 15px;
       }
     }
   }
