@@ -3130,7 +3130,7 @@ body .container-main .hero {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    color: #707070;
+    color: #777777;
     max-width: 35%; }
     body .container-main .hero .hero-text h1 {
       font-family: "Merriweather", serif;
@@ -3176,17 +3176,19 @@ body .container-main .features {
     body .container-main .features .cards .feature-card {
       width: 28%;
       max-width: 300px;
-      min-width: 250px;
+      min-width: 200px;
       border-radius: 20px;
       display: flex;
       flex-direction: column;
+      justify-content: space-between;
       align-items: center;
       padding: 25px;
-      max-height: 400px;
+      min-height: 450px;
       margin: 35px 0; }
       body .container-main .features .cards .feature-card img {
         height: 40%;
-        margin-bottom: 15px; }
+        margin-bottom: 15px;
+        max-width: 100%; }
       body .container-main .features .cards .feature-card h3 {
         font-family: "Merriweather", serif;
         font-size: 1.5rem;
@@ -3197,7 +3199,7 @@ body .container-main .features {
         font-family: "lora", serif;
         font-size: 1rem;
         text-align: center;
-        color: #707070;
+        color: #777777;
         margin-bottom: 15px;
         height: 20%; }
       body .container-main .features .cards .feature-card button {
@@ -3207,19 +3209,62 @@ body .container-main .features {
         background: #fff;
         border: none;
         font-family: "Merriweather", serif;
-        font-weight: 600;
         font-size: 1rem;
         text-align: center;
-        color: #707070; }
-  body .container-main .features #ranger {
-    background-color: #BBE1FA; }
-  body .container-main .features #genie {
-    background-color: #E2F0B4; }
-  body .container-main .features #timer {
-    background-color: #97E5EF; }
+        color: #777777; }
+      body .container-main .features .cards .feature-card#ranger {
+        background-color: #BBE1FA; }
+      body .container-main .features .cards .feature-card#genie {
+        background-color: #E2F0B4; }
+      body .container-main .features .cards .feature-card#timer {
+        background-color: #97E5EF; }
+
+body .container-main .feature-section {
+  background: rgba(151, 229, 239, 0.38);
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  padding: 50px 0;
+  text-align: center; }
+  body .container-main .feature-section .feature-logo {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: center;
+    align-items: flex-end;
+    margin-bottom: 30px; }
+    body .container-main .feature-section .feature-logo img {
+      width: 150px; }
+    body .container-main .feature-section .feature-logo span {
+      font-family: "Merriweather", serif;
+      color: #31728D;
+      font-size: 2.5rem;
+      margin-bottom: 25px;
+      margin-left: 25px;
+      white-space: nowrap; }
+  body .container-main .feature-section .feature-intro {
+    color: #777777;
+    font-family: "lora", serif;
+    font-size: 1.5rem;
+    margin-bottom: 50px; }
+  body .container-main .feature-section .script-input {
+    font-family: "lora", serif;
+    font-size: 1rem;
+    max-width: 700px;
+    width: 90%;
+    height: 300px;
+    border: 1px solid #d1cece;
+    border-radius: 10px;
+    padding: 15px;
+    outline: none;
+    box-shadow: none;
+    resize: none; }
+    body .container-main .feature-section .script-input::placeholder {
+      text-align: center;
+      padding-top: 120px;
+      color: #A0A0A0; }
 
 body .container-main footer {
-  color: #707070;
+  color: #777777;
   text-align: center;
   font-family: "lora", serif;
   font-size: 1.5rem;
@@ -3229,3 +3274,6 @@ body .container-main footer {
   body .container-main footer a {
     text-decoration: none;
     color: inherit; }
+  body .container-main footer #coffee {
+    font-size: 1rem;
+    margin-top: 15px; }
