@@ -33,6 +33,81 @@ time, mark, audio, video {
 	vertical-align: baseline;
 }
 
+.hidden {
+  display: none!important;
+}
+
+.info {
+  display: inline-block;
+  position: relative;
+  // width: 200px;
+
+
+  .info-button {
+    background: url(../img/info-icon.svg);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    width: 20px;
+    height: 20px;
+    border: none;
+
+    &:focus {
+      outline: none;
+    }
+
+    &:focus + .pop-up {
+      transform: scale(1);
+    }
+  }
+
+  .pop-up {
+    // max-width: 90%;
+    width: 300px;
+    max-height: 300px;
+    overflow: scroll;
+    border-radius: 10px;
+    background: #ffffff;
+    position: absolute;
+    font-size: 0.8rem;
+    text-align: left;
+    padding: 15px;
+    bottom: 20px;
+    left: 20px;
+    transform: scale(0);
+    transform-origin: bottom left;
+    transition: transform 0.2s ease;
+    box-shadow: 0px 12px 48px rgba(109,117,141,0.2);
+
+    button {
+      width: 20px;
+      height: 20px;
+      float: right;
+      display: block;
+      margin-left: 10px;
+      border: none;
+      background: url(../img/close-icon.svg);
+      background-repeat: no-repeat;
+      background-size: 60%;
+      background-position: center;
+
+      &:focus {
+        outline: none;
+      }
+    }
+  }
+
+}
+
+@mixin slidein {
+  @for $i from 1 through 4 {
+    &:nth-child(#{$i}) {
+      animation: slide #{350 + $i * 20}ms ease-in;
+      // animation-delay: #{$i}s;
+    }
+  }
+}
+
 html {
   overflow-x: hidden;
 }
@@ -84,6 +159,11 @@ body {
           right: 8%;
         }
 
+        #menu:checked ~ .menu > ul li {
+          // animation: slide 700ms ease-in;
+          @include slidein;
+        }
+
         label {
           width: 60px;
           height: 60px;
@@ -97,6 +177,11 @@ body {
           position: relative;
           align-items: center;
           z-index: 2;
+
+          &:hover {
+            transform: scale(1.1);
+            transition: transform 0.2s ease;
+          }
 
           .hamburger {
             background: $menu-blue;
@@ -142,7 +227,17 @@ body {
             font-size: 2rem;
             line-height: 3.5rem;
 
+            @keyframes slide {
+              0% {
+                transform: translateX(500px);
+              }
+              100% {
+                transform: translateX(0);
+              }
+            }
+
             li {
+
               a {
                 color: $menu-blue;
                 text-decoration: none;
@@ -179,17 +274,17 @@ body {
         flex-direction: column;
         justify-content: center;
         color: $gray;
-        max-width: 35%;
+        max-width: 45%;
 
         h1 {
           font-family: $merriweather;
-          font-weight: 400;
-          font-size: 3rem;
+          font-weight: 700;
+          font-size: 4rem;
         }
 
         h3 {
           font-family: $lora;
-          font-size: 1.5rem;
+          font-size: 1.7rem;
           margin-top: 25px;
         }
       }
@@ -323,19 +418,21 @@ body {
         justify-content: center;
         align-items: flex-end;
         margin-bottom: 30px;
+        max-width: 350px;
 
         img {
-          width: 150px;
-        }
+          width: 90%;
 
-        span {
-          font-family: $merriweather;
-          color: $dark-green;
-          font-size: 2.5rem;
-          margin-bottom: 25px;
-          margin-left:25px;
-          white-space: nowrap;
         }
+        //
+        // span {
+        //   font-family: $merriweather;
+        //   color: $dark-green;
+        //   font-size: 200%;
+        //   margin-bottom: 25px;
+        //   margin-left:25px;
+        //   white-space: nowrap;
+        // }
       }
 
       .feature-intro {
@@ -343,25 +440,188 @@ body {
         font-family: $lora;
         font-size: 1.5rem;
         margin-bottom: 50px;
+        width: 90%;
       }
 
-      .script-input {
-        font-family: $lora;
-        font-size: 1rem;
-        max-width: 700px;
+      .text-area {
+        max-width: 600px;
         width: 90%;
-        height: 300px;
-        border: 1px solid #d1cece;
-        border-radius: 10px;
-        padding: 15px;
-        outline: none;
-        box-shadow: none;
-        resize: none;
 
-        &::placeholder {
-          text-align: center;
-          padding-top: 120px;
-          color: #A0A0A0;
+        .script-input {
+          width: 100%;
+          font-family: $lora;
+          font-size: 1rem;
+          height: 250px;
+          border: 1px solid #d1cece;
+          border-radius: 10px;
+          padding: 15px;
+          outline: none;
+          box-shadow: none;
+          resize: none;
+
+          &::placeholder {
+            text-align: center;
+            padding-top: 90px;
+            color: #A0A0A0;
+          }
+        }
+      }
+
+      .count-and-play {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+
+        .play-script {
+          display: flex;
+          align-items: center;
+          flex-direction: row;
+          flex-wrap: nowrap;
+          font-family: $lora;
+          color: $gray;
+
+
+          #play-button {
+            background: $dark-green url(../img/play-icon.svg);
+            background-repeat: no-repeat;
+            background-position: 55% center;
+            background-size: 40%;
+            border-radius: 100%;
+            width: 45px;
+            height: 45px;
+            border: none;
+            margin-right: 10px;
+            cursor: pointer;
+
+            &.playing {
+              background: $dark-green url(../img/pause-icon.svg);
+              background-repeat: no-repeat;
+              background-position: center center;
+              background-size: 40%;
+            }
+
+            &:focus {
+              outline: none;
+            }
+
+            &:disabled {
+              filter: opacity(0.5);
+              cursor: default;
+            }
+
+          }
+
+          .play-widget {
+
+            .play-indicator {
+              display: flex;
+
+              #play-indicator {
+                margin-right: 15px;
+              }
+
+              .audio-menu {
+                position: relative;
+
+                #option-button {
+                  border: none;
+                  background: transparent;
+                  width: 40px;
+                  cursor: pointer;
+
+                  &:focus ~ a {
+                    display: flex;
+                  }
+                }
+
+                #download-button {
+                  position: absolute;
+                  background-color: #ffffff;
+                  border: none;
+                  border-radius: 10px;
+                  display: flex;
+                  align-items: center;
+                  padding: 10px;
+                  text-decoration: none;
+                  color: $gray;
+                  font-family: $lora;
+                  top: -5px;
+                  left: -5px;
+                  display: none;
+
+                  img {
+                    margin-right: 10px;
+                  }
+
+
+                }
+              }
+
+            }
+          }
+
+        }
+
+        .word-count {
+          color: $dark-green;
+          font-size: 1.2rem
+        }
+
+        .text-input-error {
+          color: $gray;
+          font-size: 0.8rem;
+          font-family: $lora;
+        }
+      }
+
+      .read-time {
+        font-family: $lora;
+        color: $gray;
+        font-size: 1.1rem;
+        margin-top: 25px;
+
+        span {
+          display: block;
+        }
+
+        #time-result {
+          margin-top: 10px;
+          font-size: 1.5rem;
+          color: #373A3C;
+        }
+      }
+
+      .wpm-adjust {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+
+        .range-selector {
+          width: 90%;
+          max-width: 400px;
+          margin-top: 30px;
+
+          #wpm-selector {
+            width: 100%;
+          }
+        }
+
+        .wpm-value {
+          margin-top: 20px;
+          font-family: $lora;
+          color: $gray;
+
+          span {
+            // display: block;
+          }
+
+          #wpm-value {
+            font-size: 1.5rem;
+            margin-bottom: 1px;
+          }
         }
       }
 
@@ -391,4 +651,163 @@ body {
       }
     }
   }
+}
+
+.lds-ellipsis {
+  display: inline-block;
+  position: relative;
+  width: 80px;
+  height: 50px;
+}
+.lds-ellipsis div {
+  position: absolute;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: $dark-green;
+  animation-timing-function: cubic-bezier(0, 1, 1, 0);
+}
+.lds-ellipsis div:nth-child(1) {
+  left: 8px;
+  animation: lds-ellipsis1 0.6s infinite;
+}
+.lds-ellipsis div:nth-child(2) {
+  left: 8px;
+  animation: lds-ellipsis2 0.6s infinite;
+}
+.lds-ellipsis div:nth-child(3) {
+  left: 32px;
+  animation: lds-ellipsis2 0.6s infinite;
+}
+.lds-ellipsis div:nth-child(4) {
+  left: 56px;
+  animation: lds-ellipsis3 0.6s infinite;
+}
+@keyframes lds-ellipsis1 {
+  0% {
+    transform: scale(0);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes lds-ellipsis3 {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(0);
+  }
+}
+@keyframes lds-ellipsis2 {
+  0% {
+    transform: translate(0, 0);
+  }
+  100% {
+    transform: translate(24px, 0);
+  }
+}
+
+.range-selector {
+
+  input[type=range] {
+    -webkit-appearance: none; /* Hides the slider so that custom slider can be made */
+    width: 100%; /* Specific width is required for Firefox. */
+    background: transparent; /* Otherwise white in Chrome */
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+  }
+
+  input[type=range]:focus {
+    outline: none; /* Removes the blue border. You should probably do some kind of focus styling for accessibility reasons though. */
+  }
+
+  input[type=range]::-ms-track {
+    width: 100%;
+    cursor: pointer;
+
+    /* Hides the slider so custom styles can be added */
+    background: transparent;
+    border-color: transparent;
+    color: transparent;
+  }
+
+  /* Special styling for WebKit/Blink */
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 16px;
+    width: 16px;
+    border-radius: 100%;
+    background: $dark-green;
+    cursor: pointer;
+    margin-top: -6px; /* You need to specify a margin in Chrome, but in Firefox and IE it is automatic */
+  }
+
+  /* All the same stuff for Firefox */
+  input[type=range]::-moz-range-thumb {
+    height: 16px;
+    width: 16px;
+    border-radius: 100%;
+    background: $dark-green;
+    border: none;
+    cursor: pointer;
+  }
+
+  /* All the same stuff for IE */
+  input[type=range]::-ms-thumb {
+    height: 16px;
+    width: 16px;
+    border-radius: 100%;
+    background: $dark-green;
+    cursor: pointer;
+    border: none;
+  }
+
+  input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 4px;
+    cursor: pointer;
+    background: $dark-green;
+    border-radius: 7px;
+  }
+
+  input[type=range]:focus::-webkit-slider-runnable-track {
+    background: $dark-green;
+  }
+
+  input[type=range]::-moz-range-track {
+    width: 100%;
+    height: 4px;
+    cursor: pointer;
+    background: $dark-green;
+    border-radius: 7px;
+  }
+
+  input[type=range]::-ms-track {
+    width: 100%;
+    height: 4px;
+    cursor: pointer;
+    background: $dark-green;
+    border-radius: 7px;
+  }
+  input[type=range]::-ms-fill-lower {
+    background: $dark-green;
+    border: none;
+    border-radius: 2.6px;
+  }
+  input[type=range]:focus::-ms-fill-lower {
+    background: $dark-green;
+  }
+  input[type=range]::-ms-fill-upper {
+    background: $dark-green;
+    border: none;
+    border-radius: 2.6px;
+  }
+  input[type=range]:focus::-ms-fill-upper {
+    background: $dark-green;
+  }
+
 }
