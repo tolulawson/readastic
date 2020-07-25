@@ -32,7 +32,7 @@
             <li class="menu-item"><a href="">Read Ranger</a></li>
             <li class="menu-item"><a href="">Book Genie</a></li>
             <li class="menu-item"><a href="">Script Timer</a></li>
-            <li class="menu-item"><a href="">About</a></li>
+            <li class="menu-item"><a href="https://paypal.me/toluopelawson">Buy me a coffee</a></li>
           </ul>
           <div class="menu-logo">
             <img src="img/logo-light.svg" alt="Bookerly logo">
@@ -48,27 +48,27 @@
         <h3><strong>Bookerly</strong> provides tools that help you you decide and enjoy your next great read.</h3>
       </div>
       <div class="hero-image">
-        <img src="img/people.svg" alt="" id="hero-people">
+        <img src="img/people.svg" alt="Illustration of people reading books" id="hero-people">
       </div>
 
     </div>
     <section class="features">
       <div class="cards">
         <div class="feature-card" id="ranger">
-          <img src="img/ranger-icon.svg" alt="">
+          <img src="img/ranger-icon.svg" alt="Book ranger logo">
           <h3>Book Ranger</h3>
           <h5>Get personalised results including how long it will take you to read any book.</h5>
           <button type="button" name="button">Get started</button>
         </div>
         <div class="feature-card" id="genie">
 
-          <img src="img/genie-icon.svg" alt="">
+          <img src="img/genie-icon.svg" alt="Book geneie logo">
           <h3>Book Genie</h3>
           <h5>Get a recommendation for your next great read.</h5>
           <button type="button" name="button">Feeling Lucky</button>
         </div>
         <div class="feature-card" id="timer">
-          <img src="img/timer-icon.svg" alt="">
+          <img src="img/timer-icon.svg" alt="Script timer logo">
           <h3>Script Timer</h3>
           <h5>Measure how long it takes to read a script at different read speeds.</h5>
           <button type="button" name="button">Get started</button>
@@ -79,22 +79,105 @@
 
     <section class="feature-section" id="script-timer">
       <div class="feature-logo">
-        <img src="img/timer-icon.svg" alt="Script timer logo">
-        <span>Script Timer</span>
+        <img src="img/timer-logo.svg" alt="Script timer logo">
+        <!-- <span>Script Timer</span> -->
       </div>
       <div class="feature-intro">
         Measure how long it takes to read a script at different read speeds.
       </div>
-      <textarea name="name" class="script-input" placeholder="Paste the text of your script or
-enter the number of words."></textarea>
-      <div class="word-count">
-        <span id=word-count>500</span> words
+      <div class="text-area">
+        <textarea name="name" class="script-input" placeholder="Paste the text of your script or
+  enter the number of words." id="text-area"></textarea>
+
+
+      <div class="count-and-play">
+          <div class="play-script">
+            <button type="button" name="button" id="play-button" class=""></button>
+
+            <audio>
+              <source src="" type="audio/mpeg">
+            Your browser does not support the audio element.
+            </audio>
+
+            <span class="play-message">Play as audio</span>
+
+            <div class="play-widget hidden">
+
+              <div class="lds-ellipsis ">
+                <div></div><div></div><div></div><div></div>
+              </div>
+
+              <div class="play-indicator hidden">
+                <div class="range-selector">
+                  <input type="range" name="play-indicator" min="0" max="100" value="90" step="1" id="play-indicator">
+                </div>
+
+                <div class="audio-menu">
+                  <button type="button" name="button" id="option-button">
+                    <img src="img/option-icon.svg" alt="Menu">
+                  </button>
+                  <a href="#" id="download-button">
+                    <img src="img/download-icon.svg" alt="Download"> Download
+                  </a>
+
+                </div>
+
+              </div>
+
+
+            </div>
+          </div>
+          <div class="word-count hidden">
+            <span id="word-count"></span> word<span class='count-plural'></span>
+
+          </div>
+          <div class="text-input-error hidden">
+            Enter a valid number or paste your script
+          </div>
+        </div>
       </div>
+
+      <div class="read-time hidden">
+        <span>
+          Estimated read time
+        </span>
+        <span id="time-result">
+
+        </span>
+      </div>
+
+      <div class="wpm-adjust">
+        <div class="range-selector">
+          <input type="range" name="" value="250" step="10" min="100" max="400" id="wpm-selector">
+        </div>
+        <div class="wpm-value">
+          <span id="wpm-value">250</span>
+          <span>words per minute
+            <div class="info">
+              <button type="button" name="button" class="info-button"></button>
+              <div class="pop-up">
+                <button type="button" name="button"></button>
+                <p>
+                  Loading.io's CSS spinner uses CSS Animation, which is wildly supported by all modern browsers such as Google Chrome and Mozilla Firefox. However, Microsoft Internet Explorer version earlier than 10 don't support CSS Animation.
+
+  To support older IE, you have to use GIF format image. Choose one from loading.io's online spinner gallery and you can customize an unique loader GIF with our icon editor easily.
+    To support older IE, you have to use GIF format image. Choose one from loading.io's online spinner gallery and you can customize an unique loader GIF with our icon editor easily.
+                </p>
+
+              </div>
+            </div>
+
+          </span>
+        </div>
+
+      </div>
+
+
     </section>
 
     <footer>
       <p>
-        <strong>Bookerly</strong> is built with ❤️ by <a href="https://twitter.com/oiza__meyi" target="_blank"><strong>Suwamatic</strong></a>
+        <strong>Bookerly</strong> is built with ❤️ by <a href="https://twitter.com/tolulawson" target="_blank"><strong>Tolu Lawson</strong></a>
       </p>
       <p id="coffee">
         Buy me a <a href="https://paypal.me/toluopelawson"><strong>coffee</strong></a>
