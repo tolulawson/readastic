@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8">
-  <title>Bookerly - Reading, transformed</title>
+  <title>Readerly - Reading, transformed</title>
   <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" type="text/css" href="css/style.css">
   <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
@@ -18,7 +18,7 @@
   <div class="container-main">
     <nav>
       <div class="logo">
-        <img src="img/logo.svg" alt="Bookerly logo">
+        <img src="img/logo.svg" alt="Readerly logo">
       </div>
 
       <div class="navigation">
@@ -35,7 +35,7 @@
             <li class="menu-item"><a href="https://paypal.me/toluopelawson">Buy me a coffee</a></li>
           </ul>
           <div class="menu-logo">
-            <img src="img/logo-light.svg" alt="Bookerly logo">
+            <img src="img/logo-light.svg" alt="Readerly logo">
           </div>
         </div>
 
@@ -45,7 +45,7 @@
     <div class="hero">
       <div class="hero-text">
         <h1>Supercharge your reading</h1>
-        <h3><strong>Bookerly</strong> provides tools that help you you decide and enjoy your next great read.</h3>
+        <h3><strong>Readerly</strong> provides tools that help you you decide and enjoy your next great read.</h3>
       </div>
       <div class="hero-image">
         <img src="img/people.svg" alt="Illustration of people reading books" id="hero-people">
@@ -55,8 +55,8 @@
     <section class="features">
       <div class="cards">
         <div class="feature-card" id="ranger">
-          <img src="img/ranger-icon.svg" alt="Book ranger logo">
-          <h3>Book Ranger</h3>
+          <img src="img/ranger-icon.svg" alt="Read ranger logo">
+          <h3>Read Ranger</h3>
           <h5>Get personalised results including how long it will take you to read any book.</h5>
           <button type="button" name="button">Get started</button>
         </div>
@@ -89,27 +89,25 @@
         <textarea name="name" class="script-input" placeholder="Paste the text of your script or
   enter the number of words." id="text-area"></textarea>
 
-
       <div class="count-and-play">
           <div class="play-script">
             <button type="button" name="button" id="play-button" class=""></button>
 
-            <audio>
-              <source src="" type="audio/mpeg">
+            <span class="play-message">Listen to audio</span>
+            <audio id='audio'>
+              <source id="audio-source" type="audio/mpeg">
             Your browser does not support the audio element.
             </audio>
 
-            <span class="play-message">Play as audio</span>
+            <div class="play-widget">
 
-            <div class="play-widget hidden">
-
-              <div class="lds-ellipsis ">
+              <div class="lds-ellipsis">
                 <div></div><div></div><div></div><div></div>
               </div>
 
-              <div class="play-indicator hidden">
+              <div class="play-indicator">
                 <div class="range-selector">
-                  <input type="range" name="play-indicator" min="0" max="100" value="90" step="1" id="play-indicator">
+                  <input type="range" name="play-indicator" min="0" max="" value="0" step="0.1" id="progress-bar">
                 </div>
 
                 <div class="audio-menu">
@@ -127,6 +125,7 @@
 
             </div>
           </div>
+
           <div class="word-count hidden">
             <span id="word-count"></span> word<span class='count-plural'></span>
 
@@ -177,7 +176,7 @@
 
     <footer>
       <p>
-        <strong>Bookerly</strong> is built with ❤️ by <a href="https://twitter.com/tolulawson" target="_blank"><strong>Tolu Lawson</strong></a>
+        <strong>Readerly</strong> is built with ❤️ by <a href="https://twitter.com/tolulawson" target="_blank"><strong>Tolu Lawson</strong></a>
       </p>
       <p id="coffee">
         Buy me a <a href="https://paypal.me/toluopelawson"><strong>coffee</strong></a>

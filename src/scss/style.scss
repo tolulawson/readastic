@@ -488,8 +488,8 @@ body {
             background-position: 55% center;
             background-size: 40%;
             border-radius: 100%;
-            width: 45px;
-            height: 45px;
+            width: 40px;
+            height: 40px;
             border: none;
             margin-right: 10px;
             cursor: pointer;
@@ -564,8 +564,11 @@ body {
         }
 
         .word-count {
-          color: $dark-green;
-          font-size: 1.2rem
+          background-color: $dark-green;
+          color: #ffffff;
+          font-size: 1rem;
+          border-radius: 5px;
+          padding: 5px 7px;
         }
 
         .text-input-error {
@@ -662,8 +665,8 @@ body {
 .lds-ellipsis div {
   position: absolute;
   top: 50%;
-  width: 13px;
-  height: 13px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: $dark-green;
   animation-timing-function: cubic-bezier(0, 1, 1, 0);
