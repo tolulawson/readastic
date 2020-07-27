@@ -41,7 +41,7 @@ gulp.task('start-sass', function() {
           ouputStyle: 'compressed',
       }).on('error', sass.logError))
         .pipe(gulp.dest('src/css'))
-        // .pipe(browsersync.stream())
+        .pipe(browsersync.stream())
 });
 
 gulp.task('cleancss', async function() {
@@ -98,7 +98,12 @@ gulp.task('image', async function () {
     .pipe(image())
     .pipe(gulp.dest('dist/img'))
   )
-})
+});
+
+gulp.task('reload', function (done) {
+    browsersync.reload();
+    done();
+});
 
 gulp.task('tests', async function() {
     gulp
@@ -114,8 +119,9 @@ gulp.task('start', async function() {
         baseDir : "src"
       }
   });
-  gulp.watch('src/scss/*.scss', {ignoreInitial: false}, gulp.series('start-sass')).on('change', browsersync.reload);
-  gulp.watch(['src/*.html', 'src/js/*.js', '!src/js/bundle.js'], {ignoreInitial: false},  gulp.series('browserify')).on('change', browsersync.reload);
+  gulp.watch('src/scss/*.scss', {ignoreInitial: false}, gulp.series('start-sass'));
+
+  gulp.watch(['src/*.html', 'src/js/*.js', '!src/js/bundle.js'], {ignoreInitial: false},  gulp.series('browserify', 'reload'));
 })
 
 gulp.task('build', async function() {

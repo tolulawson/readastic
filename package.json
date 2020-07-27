@@ -50,6 +50,7 @@
     "gulp-jasmine-browser": "^4.1.0",
     "humanize-duration": "^3.23.1",
     "jquery": "^3.5.1",
-    "popper.js": "^1.16.1"
+    "popper.js": "^1.16.1",
+    "xmlbuilder": "^15.1.1"
   }
 }
