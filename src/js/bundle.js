@@ -17208,7 +17208,7 @@ $(() => {
   const model = {
     init() {
       this.wordCount = 0;
-      this.WPM = 250;
+      this.WPM = 150;
       this.textContent = '';
       this.playStatus = 0;
     },
@@ -17266,28 +17266,53 @@ $(() => {
 
   const wpmRangeView = {
     init() {
-      this.wpm = 250;
+      this.wpmSelector = $('#wpm-selector');
+      this.step = 1;
+      this.min = 80;
+      this.max = 250;
+      this.starterWPM = 0;
 
-      function getWPM() {
-        wpmRangeView.wpm = $(this).val();
-        controller.wpmUpdated(wpmRangeView.wpm);
+      function onWPMRangeSlide() {
+        function calcAudioPlayRate() {
+          return controller.getWPMValue() / wpmRangeView.starterWPM;
+        }
+        controller.wpmUpdated($(this).val());
+        playWidgetView.audio[0].playbackRate = calcAudioPlayRate();
       }
 
-      $('#wpm-selector').on('input', getWPM);
+      $('#wpm-selector').on('input', onWPMRangeSlide);
+      wpmRangeView.render();
     },
+
+    render() {
+      wpmRangeView.wpmSelector.attr({
+        min: this.min,
+        max: this.max,
+        step: this.step,
+      });
+      wpmRangeView.wpmSelector.val(controller.getWPMValue());
+    }
 
   };
 
   const wpmValueView = {
+    init() {
+      this.render();
+    },
+
     render() {
-      $('#wpm-value').text(wpmRangeView.wpm);
+      $('#wpm-value').text(controller.getWPMValue());
     },
   };
 
   const readTimeView = {
     render(readTime) {
       $('#time-result').text(readTime);
-      $('.read-time').removeClass('hidden');
+      if (controller.getTextContent().length > 0) {
+        $('.read-time').removeClass('hidden');
+      } else {
+        $('.read-time').addClass('hidden');
+      }
     },
   };
 
@@ -17300,6 +17325,10 @@ $(() => {
       $('.input-text-error').addClass('hidden');
       $('#word-count').text(wordCount);
       $('.word-count').removeClass('hidden');
+
+      if (controller.getTextContent().length < 1) {
+        $('.word-count').addClass('hidden');
+      }
 
       if (wordCount === 1) {
         $('.count-plural').text('');
@@ -17377,12 +17406,18 @@ $(() => {
       };
       this.audio = $('#audio');
 
+      function getAudioWPM() {
+        return Math.round(model.wordCount / (playWidgetView.audio[0].duration / 60));
+      }
+
       this.audio.on('loadedmetadata', function setProgressBarMax() {
         playWidgetView.progressBar.attr('max', this.duration);
+        controller.wpmUpdated(getAudioWPM());
+        wpmRangeView.starterWPM = getAudioWPM();
       });
 
       this.audio.on('timeupdate', function updateProgressBar() {
-        playWidgetView.progressBar.val( this.currentTime);
+        playWidgetView.progressBar.val(this.currentTime);
       });
 
       this.progressBar.on('input', function seekAudio() {
@@ -17425,6 +17460,7 @@ $(() => {
       playButtonView.init();
       playMessageView.init();
       playWidgetView.init();
+      wpmValueView.init();
     },
 
     renderWPMValue() {
@@ -17463,10 +17499,9 @@ $(() => {
     textAreaChanged() {
       controller.storeWordCount(textAreaView.wordCount);
       controller.storeTextContent(textAreaView.textContent);
-      if (model.textContent.length > 0) {
-        controller.renderWordCount();
-        controller.renderReadTime();
-      }
+      controller.renderReadTime();
+      controller.renderWordCount();
+
       if (controller.getPlayStatus() < 2) {
         controller.renderPlayButton();
       }
@@ -17474,17 +17509,28 @@ $(() => {
     },
 
     renderPlayButton() {
-      if (model.textContent.length > 0) {
+      if (this.getTextContent().length > 0) {
         playButtonView.render(true);
       } else {
         playButtonView.render(false);
       }
     },
 
+    getWPMValue() {
+      return model.WPM;
+    },
+
     wpmUpdated(wpm) {
-      controller.renderWPMValue();
       controller.storeWPMValue(wpm);
-      controller.renderReadTime();
+      controller.renderWPMValue();
+      if (this.getTextContent().length > 0) {
+        controller.renderReadTime();
+      }
+      wpmRangeView.render();
+    },
+
+    getTextContent() {
+      return model.textContent;
     },
 
     renderPlayWidget() {
@@ -17502,7 +17548,7 @@ $(() => {
       controller.renderPlayButton();
     },
 
-    fetchAudio(text = model.textContent, voice = 'Microsoft Server Speech Text to Speech Voice (en-US, AriaNeural)') {
+    fetchAudio(text = this.getTextContent(), voice = 'Microsoft Server Speech Text to Speech Voice (en-US, AriaNeural)') {
       return new Promise((resolve) => {
         $.ajax({
           url: 'https://westus2.api.cognitive.microsoft.com/sts/v1.0/issuetoken',
