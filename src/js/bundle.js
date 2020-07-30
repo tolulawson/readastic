@@ -1,4 +1,6216 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+(function (process){
+/**
+ * @popperjs/core v2.4.4 - MIT License
+ */
+
+'use strict';
+
+Object.defineProperty(exports, '__esModule', { value: true });
+
+function getBoundingClientRect(element) {
+  var rect = element.getBoundingClientRect();
+  return {
+    width: rect.width,
+    height: rect.height,
+    top: rect.top,
+    right: rect.right,
+    bottom: rect.bottom,
+    left: rect.left,
+    x: rect.left,
+    y: rect.top
+  };
+}
+
+/*:: import type { Window } from '../types'; */
+
+/*:: declare function getWindow(node: Node | Window): Window; */
+function getWindow(node) {
+  if (node.toString() !== '[object Window]') {
+    var ownerDocument = node.ownerDocument;
+    return ownerDocument ? ownerDocument.defaultView : window;
+  }
+
+  return node;
+}
+
+function getWindowScroll(node) {
+  var win = getWindow(node);
+  var scrollLeft = win.pageXOffset;
+  var scrollTop = win.pageYOffset;
+  return {
+    scrollLeft: scrollLeft,
+    scrollTop: scrollTop
+  };
+}
+
+/*:: declare function isElement(node: mixed): boolean %checks(node instanceof
+  Element); */
+
+function isElement(node) {
+  var OwnElement = getWindow(node).Element;
+  return node instanceof OwnElement || node instanceof Element;
+}
+/*:: declare function isHTMLElement(node: mixed): boolean %checks(node instanceof
+  HTMLElement); */
+
+
+function isHTMLElement(node) {
+  var OwnElement = getWindow(node).HTMLElement;
+  return node instanceof OwnElement || node instanceof HTMLElement;
+}
+
+function getHTMLElementScroll(element) {
+  return {
+    scrollLeft: element.scrollLeft,
+    scrollTop: element.scrollTop
+  };
+}
+
+function getNodeScroll(node) {
+  if (node === getWindow(node) || !isHTMLElement(node)) {
+    return getWindowScroll(node);
+  } else {
+    return getHTMLElementScroll(node);
+  }
+}
+
+function getNodeName(element) {
+  return element ? (element.nodeName || '').toLowerCase() : null;
+}
+
+function getDocumentElement(element) {
+  // $FlowFixMe: assume body is always available
+  return (isElement(element) ? element.ownerDocument : element.document).documentElement;
+}
+
+function getWindowScrollBarX(element) {
+  // If <html> has a CSS width greater than the viewport, then this will be
+  // incorrect for RTL.
+  // Popper 1 is broken in this case and never had a bug report so let's assume
+  // it's not an issue. I don't think anyone ever specifies width on <html>
+  // anyway.
+  // Browsers where the left scrollbar doesn't cause an issue report `0` for
+  // this (e.g. Edge 2019, IE11, Safari)
+  return getBoundingClientRect(getDocumentElement(element)).left + getWindowScroll(element).scrollLeft;
+}
+
+function getComputedStyle(element) {
+  return getWindow(element).getComputedStyle(element);
+}
+
+function isScrollParent(element) {
+  // Firefox wants us to check `-x` and `-y` variations as well
+  var _getComputedStyle = getComputedStyle(element),
+      overflow = _getComputedStyle.overflow,
+      overflowX = _getComputedStyle.overflowX,
+      overflowY = _getComputedStyle.overflowY;
+
+  return /auto|scroll|overlay|hidden/.test(overflow + overflowY + overflowX);
+}
+
+// Composite means it takes into account transforms as well as layout.
+
+function getCompositeRect(elementOrVirtualElement, offsetParent, isFixed) {
+  if (isFixed === void 0) {
+    isFixed = false;
+  }
+
+  var documentElement = getDocumentElement(offsetParent);
+  var rect = getBoundingClientRect(elementOrVirtualElement);
+  var isOffsetParentAnElement = isHTMLElement(offsetParent);
+  var scroll = {
+    scrollLeft: 0,
+    scrollTop: 0
+  };
+  var offsets = {
+    x: 0,
+    y: 0
+  };
+
+  if (isOffsetParentAnElement || !isOffsetParentAnElement && !isFixed) {
+    if (getNodeName(offsetParent) !== 'body' || // https://github.com/popperjs/popper-core/issues/1078
+    isScrollParent(documentElement)) {
+      scroll = getNodeScroll(offsetParent);
+    }
+
+    if (isHTMLElement(offsetParent)) {
+      offsets = getBoundingClientRect(offsetParent);
+      offsets.x += offsetParent.clientLeft;
+      offsets.y += offsetParent.clientTop;
+    } else if (documentElement) {
+      offsets.x = getWindowScrollBarX(documentElement);
+    }
+  }
+
+  return {
+    x: rect.left + scroll.scrollLeft - offsets.x,
+    y: rect.top + scroll.scrollTop - offsets.y,
+    width: rect.width,
+    height: rect.height
+  };
+}
+
+// Returns the layout rect of an element relative to its offsetParent. Layout
+// means it doesn't take into account transforms.
+function getLayoutRect(element) {
+  return {
+    x: element.offsetLeft,
+    y: element.offsetTop,
+    width: element.offsetWidth,
+    height: element.offsetHeight
+  };
+}
+
+function getParentNode(element) {
+  if (getNodeName(element) === 'html') {
+    return element;
+  }
+
+  return (// $FlowFixMe: this is a quicker (but less type safe) way to save quite some bytes from the bundle
+    element.assignedSlot || // step into the shadow DOM of the parent of a slotted node
+    element.parentNode || // DOM Element detected
+    // $FlowFixMe: need a better way to handle this...
+    element.host || // ShadowRoot detected
+    // $FlowFixMe: HTMLElement is a Node
+    getDocumentElement(element) // fallback
+
+  );
+}
+
+function getScrollParent(node) {
+  if (['html', 'body', '#document'].indexOf(getNodeName(node)) >= 0) {
+    // $FlowFixMe: assume body is always available
+    return node.ownerDocument.body;
+  }
+
+  if (isHTMLElement(node) && isScrollParent(node)) {
+    return node;
+  }
+
+  return getScrollParent(getParentNode(node));
+}
+
+/*
+given a DOM element, return the list of all scroll parents, up the list of ancesors
+until we get to the top window object. This list is what we attach scroll listeners
+to, because if any of these parent elements scroll, we'll need to re-calculate the 
+reference element's position.
+*/
+
+function listScrollParents(element, list) {
+  if (list === void 0) {
+    list = [];
+  }
+
+  var scrollParent = getScrollParent(element);
+  var isBody = getNodeName(scrollParent) === 'body';
+  var win = getWindow(scrollParent);
+  var target = isBody ? [win].concat(win.visualViewport || [], isScrollParent(scrollParent) ? scrollParent : []) : scrollParent;
+  var updatedList = list.concat(target);
+  return isBody ? updatedList : // $FlowFixMe: isBody tells us target will be an HTMLElement here
+  updatedList.concat(listScrollParents(getParentNode(target)));
+}
+
+function isTableElement(element) {
+  return ['table', 'td', 'th'].indexOf(getNodeName(element)) >= 0;
+}
+
+function getTrueOffsetParent(element) {
+  if (!isHTMLElement(element) || // https://github.com/popperjs/popper-core/issues/837
+  getComputedStyle(element).position === 'fixed') {
+    return null;
+  }
+
+  var offsetParent = element.offsetParent;
+
+  if (offsetParent) {
+    var html = getDocumentElement(offsetParent);
+
+    if (getNodeName(offsetParent) === 'body' && getComputedStyle(offsetParent).position === 'static' && getComputedStyle(html).position !== 'static') {
+      return html;
+    }
+  }
+
+  return offsetParent;
+} // `.offsetParent` reports `null` for fixed elements, while absolute elements
+// return the containing block
+
+
+function getContainingBlock(element) {
+  var currentNode = getParentNode(element);
+
+  while (isHTMLElement(currentNode) && ['html', 'body'].indexOf(getNodeName(currentNode)) < 0) {
+    var css = getComputedStyle(currentNode); // This is non-exhaustive but covers the most common CSS properties that
+    // create a containing block.
+
+    if (css.transform !== 'none' || css.perspective !== 'none' || css.willChange && css.willChange !== 'auto') {
+      return currentNode;
+    } else {
+      currentNode = currentNode.parentNode;
+    }
+  }
+
+  return null;
+} // Gets the closest ancestor positioned element. Handles some edge cases,
+// such as table ancestors and cross browser bugs.
+
+
+function getOffsetParent(element) {
+  var window = getWindow(element);
+  var offsetParent = getTrueOffsetParent(element);
+
+  while (offsetParent && isTableElement(offsetParent) && getComputedStyle(offsetParent).position === 'static') {
+    offsetParent = getTrueOffsetParent(offsetParent);
+  }
+
+  if (offsetParent && getNodeName(offsetParent) === 'body' && getComputedStyle(offsetParent).position === 'static') {
+    return window;
+  }
+
+  return offsetParent || getContainingBlock(element) || window;
+}
+
+var top = 'top';
+var bottom = 'bottom';
+var right = 'right';
+var left = 'left';
+var auto = 'auto';
+var basePlacements = [top, bottom, right, left];
+var start = 'start';
+var end = 'end';
+var clippingParents = 'clippingParents';
+var viewport = 'viewport';
+var popper = 'popper';
+var reference = 'reference';
+var variationPlacements = /*#__PURE__*/basePlacements.reduce(function (acc, placement) {
+  return acc.concat([placement + "-" + start, placement + "-" + end]);
+}, []);
+var placements = /*#__PURE__*/[].concat(basePlacements, [auto]).reduce(function (acc, placement) {
+  return acc.concat([placement, placement + "-" + start, placement + "-" + end]);
+}, []); // modifiers that need to read the DOM
+
+var beforeRead = 'beforeRead';
+var read = 'read';
+var afterRead = 'afterRead'; // pure-logic modifiers
+
+var beforeMain = 'beforeMain';
+var main = 'main';
+var afterMain = 'afterMain'; // modifier with the purpose to write to the DOM (or write into a framework state)
+
+var beforeWrite = 'beforeWrite';
+var write = 'write';
+var afterWrite = 'afterWrite';
+var modifierPhases = [beforeRead, read, afterRead, beforeMain, main, afterMain, beforeWrite, write, afterWrite];
+
+function order(modifiers) {
+  var map = new Map();
+  var visited = new Set();
+  var result = [];
+  modifiers.forEach(function (modifier) {
+    map.set(modifier.name, modifier);
+  }); // On visiting object, check for its dependencies and visit them recursively
+
+  function sort(modifier) {
+    visited.add(modifier.name);
+    var requires = [].concat(modifier.requires || [], modifier.requiresIfExists || []);
+    requires.forEach(function (dep) {
+      if (!visited.has(dep)) {
+        var depModifier = map.get(dep);
+
+        if (depModifier) {
+          sort(depModifier);
+        }
+      }
+    });
+    result.push(modifier);
+  }
+
+  modifiers.forEach(function (modifier) {
+    if (!visited.has(modifier.name)) {
+      // check for visited object
+      sort(modifier);
+    }
+  });
+  return result;
+}
+
+function orderModifiers(modifiers) {
+  // order based on dependencies
+  var orderedModifiers = order(modifiers); // order based on phase
+
+  return modifierPhases.reduce(function (acc, phase) {
+    return acc.concat(orderedModifiers.filter(function (modifier) {
+      return modifier.phase === phase;
+    }));
+  }, []);
+}
+
+function debounce(fn) {
+  var pending;
+  return function () {
+    if (!pending) {
+      pending = new Promise(function (resolve) {
+        Promise.resolve().then(function () {
+          pending = undefined;
+          resolve(fn());
+        });
+      });
+    }
+
+    return pending;
+  };
+}
+
+function format(str) {
+  for (var _len = arguments.length, args = new Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+    args[_key - 1] = arguments[_key];
+  }
+
+  return [].concat(args).reduce(function (p, c) {
+    return p.replace(/%s/, c);
+  }, str);
+}
+
+var INVALID_MODIFIER_ERROR = 'Popper: modifier "%s" provided an invalid %s property, expected %s but got %s';
+var MISSING_DEPENDENCY_ERROR = 'Popper: modifier "%s" requires "%s", but "%s" modifier is not available';
+var VALID_PROPERTIES = ['name', 'enabled', 'phase', 'fn', 'effect', 'requires', 'options'];
+function validateModifiers(modifiers) {
+  modifiers.forEach(function (modifier) {
+    Object.keys(modifier).forEach(function (key) {
+      switch (key) {
+        case 'name':
+          if (typeof modifier.name !== 'string') {
+            console.error(format(INVALID_MODIFIER_ERROR, String(modifier.name), '"name"', '"string"', "\"" + String(modifier.name) + "\""));
+          }
+
+          break;
+
+        case 'enabled':
+          if (typeof modifier.enabled !== 'boolean') {
+            console.error(format(INVALID_MODIFIER_ERROR, modifier.name, '"enabled"', '"boolean"', "\"" + String(modifier.enabled) + "\""));
+          }
+
+        case 'phase':
+          if (modifierPhases.indexOf(modifier.phase) < 0) {
+            console.error(format(INVALID_MODIFIER_ERROR, modifier.name, '"phase"', "either " + modifierPhases.join(', '), "\"" + String(modifier.phase) + "\""));
+          }
+
+          break;
+
+        case 'fn':
+          if (typeof modifier.fn !== 'function') {
+            console.error(format(INVALID_MODIFIER_ERROR, modifier.name, '"fn"', '"function"', "\"" + String(modifier.fn) + "\""));
+          }
+
+          break;
+
+        case 'effect':
+          if (typeof modifier.effect !== 'function') {
+            console.error(format(INVALID_MODIFIER_ERROR, modifier.name, '"effect"', '"function"', "\"" + String(modifier.fn) + "\""));
+          }
+
+          break;
+
+        case 'requires':
+          if (!Array.isArray(modifier.requires)) {
+            console.error(format(INVALID_MODIFIER_ERROR, modifier.name, '"requires"', '"array"', "\"" + String(modifier.requires) + "\""));
+          }
+
+          break;
+
+        case 'requiresIfExists':
+          if (!Array.isArray(modifier.requiresIfExists)) {
+            console.error(format(INVALID_MODIFIER_ERROR, modifier.name, '"requiresIfExists"', '"array"', "\"" + String(modifier.requiresIfExists) + "\""));
+          }
+
+          break;
+
+        case 'options':
+        case 'data':
+          break;
+
+        default:
+          console.error("PopperJS: an invalid property has been provided to the \"" + modifier.name + "\" modifier, valid properties are " + VALID_PROPERTIES.map(function (s) {
+            return "\"" + s + "\"";
+          }).join(', ') + "; but \"" + key + "\" was provided.");
+      }
+
+      modifier.requires && modifier.requires.forEach(function (requirement) {
+        if (modifiers.find(function (mod) {
+          return mod.name === requirement;
+        }) == null) {
+          console.error(format(MISSING_DEPENDENCY_ERROR, String(modifier.name), requirement, requirement));
+        }
+      });
+    });
+  });
+}
+
+function uniqueBy(arr, fn) {
+  var identifiers = new Set();
+  return arr.filter(function (item) {
+    var identifier = fn(item);
+
+    if (!identifiers.has(identifier)) {
+      identifiers.add(identifier);
+      return true;
+    }
+  });
+}
+
+function getBasePlacement(placement) {
+  return placement.split('-')[0];
+}
+
+function mergeByName(modifiers) {
+  var merged = modifiers.reduce(function (merged, current) {
+    var existing = merged[current.name];
+    merged[current.name] = existing ? Object.assign(Object.assign(Object.assign({}, existing), current), {}, {
+      options: Object.assign(Object.assign({}, existing.options), current.options),
+      data: Object.assign(Object.assign({}, existing.data), current.data)
+    }) : current;
+    return merged;
+  }, {}); // IE11 does not support Object.values
+
+  return Object.keys(merged).map(function (key) {
+    return merged[key];
+  });
+}
+
+function getViewportRect(element) {
+  var win = getWindow(element);
+  var html = getDocumentElement(element);
+  var visualViewport = win.visualViewport;
+  var width = html.clientWidth;
+  var height = html.clientHeight;
+  var x = 0;
+  var y = 0; // NB: This isn't supported on iOS <= 12. If the keyboard is open, the popper
+  // can be obscured underneath it.
+  // Also, `html.clientHeight` adds the bottom bar height in Safari iOS, even
+  // if it isn't open, so if this isn't available, the popper will be detected
+  // to overflow the bottom of the screen too early.
+
+  if (visualViewport) {
+    width = visualViewport.width;
+    height = visualViewport.height; // Uses Layout Viewport (like Chrome; Safari does not currently)
+    // In Chrome, it returns a value very close to 0 (+/-) but contains rounding
+    // errors due to floating point numbers, so we need to check precision.
+    // Safari returns a number <= 0, usually < -1 when pinch-zoomed
+    // Feature detection fails in mobile emulation mode in Chrome.
+    // Math.abs(win.innerWidth / visualViewport.scale - visualViewport.width) <
+    // 0.001
+    // Fallback here: "Not Safari" userAgent
+
+    if (!/^((?!chrome|android).)*safari/i.test(navigator.userAgent)) {
+      x = visualViewport.offsetLeft;
+      y = visualViewport.offsetTop;
+    }
+  }
+
+  return {
+    width: width,
+    height: height,
+    x: x + getWindowScrollBarX(element),
+    y: y
+  };
+}
+
+// of the `<html>` and `<body>` rect bounds if horizontally scrollable
+
+function getDocumentRect(element) {
+  var html = getDocumentElement(element);
+  var winScroll = getWindowScroll(element);
+  var body = element.ownerDocument.body;
+  var width = Math.max(html.scrollWidth, html.clientWidth, body ? body.scrollWidth : 0, body ? body.clientWidth : 0);
+  var height = Math.max(html.scrollHeight, html.clientHeight, body ? body.scrollHeight : 0, body ? body.clientHeight : 0);
+  var x = -winScroll.scrollLeft + getWindowScrollBarX(element);
+  var y = -winScroll.scrollTop;
+
+  if (getComputedStyle(body || html).direction === 'rtl') {
+    x += Math.max(html.clientWidth, body ? body.clientWidth : 0) - width;
+  }
+
+  return {
+    width: width,
+    height: height,
+    x: x,
+    y: y
+  };
+}
+
+function contains(parent, child) {
+  // $FlowFixMe: hasOwnProperty doesn't seem to work in tests
+  var isShadow = Boolean(child.getRootNode && child.getRootNode().host); // First, attempt with faster native method
+
+  if (parent.contains(child)) {
+    return true;
+  } // then fallback to custom implementation with Shadow DOM support
+  else if (isShadow) {
+      var next = child;
+
+      do {
+        if (next && parent.isSameNode(next)) {
+          return true;
+        } // $FlowFixMe: need a better way to handle this...
+
+
+        next = next.parentNode || next.host;
+      } while (next);
+    } // Give up, the result is false
+
+
+  return false;
+}
+
+function rectToClientRect(rect) {
+  return Object.assign(Object.assign({}, rect), {}, {
+    left: rect.x,
+    top: rect.y,
+    right: rect.x + rect.width,
+    bottom: rect.y + rect.height
+  });
+}
+
+function getInnerBoundingClientRect(element) {
+  var rect = getBoundingClientRect(element);
+  rect.top = rect.top + element.clientTop;
+  rect.left = rect.left + element.clientLeft;
+  rect.bottom = rect.top + element.clientHeight;
+  rect.right = rect.left + element.clientWidth;
+  rect.width = element.clientWidth;
+  rect.height = element.clientHeight;
+  rect.x = rect.left;
+  rect.y = rect.top;
+  return rect;
+}
+
+function getClientRectFromMixedType(element, clippingParent) {
+  return clippingParent === viewport ? rectToClientRect(getViewportRect(element)) : isHTMLElement(clippingParent) ? getInnerBoundingClientRect(clippingParent) : rectToClientRect(getDocumentRect(getDocumentElement(element)));
+} // A "clipping parent" is an overflowable container with the characteristic of
+// clipping (or hiding) overflowing elements with a position different from
+// `initial`
+
+
+function getClippingParents(element) {
+  var clippingParents = listScrollParents(getParentNode(element));
+  var canEscapeClipping = ['absolute', 'fixed'].indexOf(getComputedStyle(element).position) >= 0;
+  var clipperElement = canEscapeClipping && isHTMLElement(element) ? getOffsetParent(element) : element;
+
+  if (!isElement(clipperElement)) {
+    return [];
+  } // $FlowFixMe: https://github.com/facebook/flow/issues/1414
+
+
+  return clippingParents.filter(function (clippingParent) {
+    return isElement(clippingParent) && contains(clippingParent, clipperElement) && getNodeName(clippingParent) !== 'body';
+  });
+} // Gets the maximum area that the element is visible in due to any number of
+// clipping parents
+
+
+function getClippingRect(element, boundary, rootBoundary) {
+  var mainClippingParents = boundary === 'clippingParents' ? getClippingParents(element) : [].concat(boundary);
+  var clippingParents = [].concat(mainClippingParents, [rootBoundary]);
+  var firstClippingParent = clippingParents[0];
+  var clippingRect = clippingParents.reduce(function (accRect, clippingParent) {
+    var rect = getClientRectFromMixedType(element, clippingParent);
+    accRect.top = Math.max(rect.top, accRect.top);
+    accRect.right = Math.min(rect.right, accRect.right);
+    accRect.bottom = Math.min(rect.bottom, accRect.bottom);
+    accRect.left = Math.max(rect.left, accRect.left);
+    return accRect;
+  }, getClientRectFromMixedType(element, firstClippingParent));
+  clippingRect.width = clippingRect.right - clippingRect.left;
+  clippingRect.height = clippingRect.bottom - clippingRect.top;
+  clippingRect.x = clippingRect.left;
+  clippingRect.y = clippingRect.top;
+  return clippingRect;
+}
+
+function getVariation(placement) {
+  return placement.split('-')[1];
+}
+
+function getMainAxisFromPlacement(placement) {
+  return ['top', 'bottom'].indexOf(placement) >= 0 ? 'x' : 'y';
+}
+
+function computeOffsets(_ref) {
+  var reference = _ref.reference,
+      element = _ref.element,
+      placement = _ref.placement;
+  var basePlacement = placement ? getBasePlacement(placement) : null;
+  var variation = placement ? getVariation(placement) : null;
+  var commonX = reference.x + reference.width / 2 - element.width / 2;
+  var commonY = reference.y + reference.height / 2 - element.height / 2;
+  var offsets;
+
+  switch (basePlacement) {
+    case top:
+      offsets = {
+        x: commonX,
+        y: reference.y - element.height
+      };
+      break;
+
+    case bottom:
+      offsets = {
+        x: commonX,
+        y: reference.y + reference.height
+      };
+      break;
+
+    case right:
+      offsets = {
+        x: reference.x + reference.width,
+        y: commonY
+      };
+      break;
+
+    case left:
+      offsets = {
+        x: reference.x - element.width,
+        y: commonY
+      };
+      break;
+
+    default:
+      offsets = {
+        x: reference.x,
+        y: reference.y
+      };
+  }
+
+  var mainAxis = basePlacement ? getMainAxisFromPlacement(basePlacement) : null;
+
+  if (mainAxis != null) {
+    var len = mainAxis === 'y' ? 'height' : 'width';
+
+    switch (variation) {
+      case start:
+        offsets[mainAxis] = Math.floor(offsets[mainAxis]) - Math.floor(reference[len] / 2 - element[len] / 2);
+        break;
+
+      case end:
+        offsets[mainAxis] = Math.floor(offsets[mainAxis]) + Math.ceil(reference[len] / 2 - element[len] / 2);
+        break;
+    }
+  }
+
+  return offsets;
+}
+
+function getFreshSideObject() {
+  return {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0
+  };
+}
+
+function mergePaddingObject(paddingObject) {
+  return Object.assign(Object.assign({}, getFreshSideObject()), paddingObject);
+}
+
+function expandToHashMap(value, keys) {
+  return keys.reduce(function (hashMap, key) {
+    hashMap[key] = value;
+    return hashMap;
+  }, {});
+}
+
+function detectOverflow(state, options) {
+  if (options === void 0) {
+    options = {};
+  }
+
+  var _options = options,
+      _options$placement = _options.placement,
+      placement = _options$placement === void 0 ? state.placement : _options$placement,
+      _options$boundary = _options.boundary,
+      boundary = _options$boundary === void 0 ? clippingParents : _options$boundary,
+      _options$rootBoundary = _options.rootBoundary,
+      rootBoundary = _options$rootBoundary === void 0 ? viewport : _options$rootBoundary,
+      _options$elementConte = _options.elementContext,
+      elementContext = _options$elementConte === void 0 ? popper : _options$elementConte,
+      _options$altBoundary = _options.altBoundary,
+      altBoundary = _options$altBoundary === void 0 ? false : _options$altBoundary,
+      _options$padding = _options.padding,
+      padding = _options$padding === void 0 ? 0 : _options$padding;
+  var paddingObject = mergePaddingObject(typeof padding !== 'number' ? padding : expandToHashMap(padding, basePlacements));
+  var altContext = elementContext === popper ? reference : popper;
+  var referenceElement = state.elements.reference;
+  var popperRect = state.rects.popper;
+  var element = state.elements[altBoundary ? altContext : elementContext];
+  var clippingClientRect = getClippingRect(isElement(element) ? element : element.contextElement || getDocumentElement(state.elements.popper), boundary, rootBoundary);
+  var referenceClientRect = getBoundingClientRect(referenceElement);
+  var popperOffsets = computeOffsets({
+    reference: referenceClientRect,
+    element: popperRect,
+    strategy: 'absolute',
+    placement: placement
+  });
+  var popperClientRect = rectToClientRect(Object.assign(Object.assign({}, popperRect), popperOffsets));
+  var elementClientRect = elementContext === popper ? popperClientRect : referenceClientRect; // positive = overflowing the clipping rect
+  // 0 or negative = within the clipping rect
+
+  var overflowOffsets = {
+    top: clippingClientRect.top - elementClientRect.top + paddingObject.top,
+    bottom: elementClientRect.bottom - clippingClientRect.bottom + paddingObject.bottom,
+    left: clippingClientRect.left - elementClientRect.left + paddingObject.left,
+    right: elementClientRect.right - clippingClientRect.right + paddingObject.right
+  };
+  var offsetData = state.modifiersData.offset; // Offsets can be applied only to the popper element
+
+  if (elementContext === popper && offsetData) {
+    var offset = offsetData[placement];
+    Object.keys(overflowOffsets).forEach(function (key) {
+      var multiply = [right, bottom].indexOf(key) >= 0 ? 1 : -1;
+      var axis = [top, bottom].indexOf(key) >= 0 ? 'y' : 'x';
+      overflowOffsets[key] += offset[axis] * multiply;
+    });
+  }
+
+  return overflowOffsets;
+}
+
+var INVALID_ELEMENT_ERROR = 'Popper: Invalid reference or popper argument provided. They must be either a DOM element or virtual element.';
+var INFINITE_LOOP_ERROR = 'Popper: An infinite loop in the modifiers cycle has been detected! The cycle has been interrupted to prevent a browser crash.';
+var DEFAULT_OPTIONS = {
+  placement: 'bottom',
+  modifiers: [],
+  strategy: 'absolute'
+};
+
+function areValidElements() {
+  for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+    args[_key] = arguments[_key];
+  }
+
+  return !args.some(function (element) {
+    return !(element && typeof element.getBoundingClientRect === 'function');
+  });
+}
+
+function popperGenerator(generatorOptions) {
+  if (generatorOptions === void 0) {
+    generatorOptions = {};
+  }
+
+  var _generatorOptions = generatorOptions,
+      _generatorOptions$def = _generatorOptions.defaultModifiers,
+      defaultModifiers = _generatorOptions$def === void 0 ? [] : _generatorOptions$def,
+      _generatorOptions$def2 = _generatorOptions.defaultOptions,
+      defaultOptions = _generatorOptions$def2 === void 0 ? DEFAULT_OPTIONS : _generatorOptions$def2;
+  return function createPopper(reference, popper, options) {
+    if (options === void 0) {
+      options = defaultOptions;
+    }
+
+    var state = {
+      placement: 'bottom',
+      orderedModifiers: [],
+      options: Object.assign(Object.assign({}, DEFAULT_OPTIONS), defaultOptions),
+      modifiersData: {},
+      elements: {
+        reference: reference,
+        popper: popper
+      },
+      attributes: {},
+      styles: {}
+    };
+    var effectCleanupFns = [];
+    var isDestroyed = false;
+    var instance = {
+      state: state,
+      setOptions: function setOptions(options) {
+        cleanupModifierEffects();
+        state.options = Object.assign(Object.assign(Object.assign({}, defaultOptions), state.options), options);
+        state.scrollParents = {
+          reference: isElement(reference) ? listScrollParents(reference) : reference.contextElement ? listScrollParents(reference.contextElement) : [],
+          popper: listScrollParents(popper)
+        }; // Orders the modifiers based on their dependencies and `phase`
+        // properties
+
+        var orderedModifiers = orderModifiers(mergeByName([].concat(defaultModifiers, state.options.modifiers))); // Strip out disabled modifiers
+
+        state.orderedModifiers = orderedModifiers.filter(function (m) {
+          return m.enabled;
+        }); // Validate the provided modifiers so that the consumer will get warned
+        // if one of the modifiers is invalid for any reason
+
+        if (process.env.NODE_ENV !== "production") {
+          var modifiers = uniqueBy([].concat(orderedModifiers, state.options.modifiers), function (_ref) {
+            var name = _ref.name;
+            return name;
+          });
+          validateModifiers(modifiers);
+
+          if (getBasePlacement(state.options.placement) === auto) {
+            var flipModifier = state.orderedModifiers.find(function (_ref2) {
+              var name = _ref2.name;
+              return name === 'flip';
+            });
+
+            if (!flipModifier) {
+              console.error(['Popper: "auto" placements require the "flip" modifier be', 'present and enabled to work.'].join(' '));
+            }
+          }
+
+          var _getComputedStyle = getComputedStyle(popper),
+              marginTop = _getComputedStyle.marginTop,
+              marginRight = _getComputedStyle.marginRight,
+              marginBottom = _getComputedStyle.marginBottom,
+              marginLeft = _getComputedStyle.marginLeft; // We no longer take into account `margins` on the popper, and it can
+          // cause bugs with positioning, so we'll warn the consumer
+
+
+          if ([marginTop, marginRight, marginBottom, marginLeft].some(function (margin) {
+            return parseFloat(margin);
+          })) {
+            console.warn(['Popper: CSS "margin" styles cannot be used to apply padding', 'between the popper and its reference element or boundary.', 'To replicate margin, use the `offset` modifier, as well as', 'the `padding` option in the `preventOverflow` and `flip`', 'modifiers.'].join(' '));
+          }
+        }
+
+        runModifierEffects();
+        return instance.update();
+      },
+      // Sync update – it will always be executed, even if not necessary. This
+      // is useful for low frequency updates where sync behavior simplifies the
+      // logic.
+      // For high frequency updates (e.g. `resize` and `scroll` events), always
+      // prefer the async Popper#update method
+      forceUpdate: function forceUpdate() {
+        if (isDestroyed) {
+          return;
+        }
+
+        var _state$elements = state.elements,
+            reference = _state$elements.reference,
+            popper = _state$elements.popper; // Don't proceed if `reference` or `popper` are not valid elements
+        // anymore
+
+        if (!areValidElements(reference, popper)) {
+          if (process.env.NODE_ENV !== "production") {
+            console.error(INVALID_ELEMENT_ERROR);
+          }
+
+          return;
+        } // Store the reference and popper rects to be read by modifiers
+
+
+        state.rects = {
+          reference: getCompositeRect(reference, getOffsetParent(popper), state.options.strategy === 'fixed'),
+          popper: getLayoutRect(popper)
+        }; // Modifiers have the ability to reset the current update cycle. The
+        // most common use case for this is the `flip` modifier changing the
+        // placement, which then needs to re-run all the modifiers, because the
+        // logic was previously ran for the previous placement and is therefore
+        // stale/incorrect
+
+        state.reset = false;
+        state.placement = state.options.placement; // On each update cycle, the `modifiersData` property for each modifier
+        // is filled with the initial data specified by the modifier. This means
+        // it doesn't persist and is fresh on each update.
+        // To ensure persistent data, use `${name}#persistent`
+
+        state.orderedModifiers.forEach(function (modifier) {
+          return state.modifiersData[modifier.name] = Object.assign({}, modifier.data);
+        });
+        var __debug_loops__ = 0;
+
+        for (var index = 0; index < state.orderedModifiers.length; index++) {
+          if (process.env.NODE_ENV !== "production") {
+            __debug_loops__ += 1;
+
+            if (__debug_loops__ > 100) {
+              console.error(INFINITE_LOOP_ERROR);
+              break;
+            }
+          }
+
+          if (state.reset === true) {
+            state.reset = false;
+            index = -1;
+            continue;
+          }
+
+          var _state$orderedModifie = state.orderedModifiers[index],
+              fn = _state$orderedModifie.fn,
+              _state$orderedModifie2 = _state$orderedModifie.options,
+              _options = _state$orderedModifie2 === void 0 ? {} : _state$orderedModifie2,
+              name = _state$orderedModifie.name;
+
+          if (typeof fn === 'function') {
+            state = fn({
+              state: state,
+              options: _options,
+              name: name,
+              instance: instance
+            }) || state;
+          }
+        }
+      },
+      // Async and optimistically optimized update – it will not be executed if
+      // not necessary (debounced to run at most once-per-tick)
+      update: debounce(function () {
+        return new Promise(function (resolve) {
+          instance.forceUpdate();
+          resolve(state);
+        });
+      }),
+      destroy: function destroy() {
+        cleanupModifierEffects();
+        isDestroyed = true;
+      }
+    };
+
+    if (!areValidElements(reference, popper)) {
+      if (process.env.NODE_ENV !== "production") {
+        console.error(INVALID_ELEMENT_ERROR);
+      }
+
+      return instance;
+    }
+
+    instance.setOptions(options).then(function (state) {
+      if (!isDestroyed && options.onFirstUpdate) {
+        options.onFirstUpdate(state);
+      }
+    }); // Modifiers have the ability to execute arbitrary code before the first
+    // update cycle runs. They will be executed in the same order as the update
+    // cycle. This is useful when a modifier adds some persistent data that
+    // other modifiers need to use, but the modifier is run after the dependent
+    // one.
+
+    function runModifierEffects() {
+      state.orderedModifiers.forEach(function (_ref3) {
+        var name = _ref3.name,
+            _ref3$options = _ref3.options,
+            options = _ref3$options === void 0 ? {} : _ref3$options,
+            effect = _ref3.effect;
+
+        if (typeof effect === 'function') {
+          var cleanupFn = effect({
+            state: state,
+            name: name,
+            instance: instance,
+            options: options
+          });
+
+          var noopFn = function noopFn() {};
+
+          effectCleanupFns.push(cleanupFn || noopFn);
+        }
+      });
+    }
+
+    function cleanupModifierEffects() {
+      effectCleanupFns.forEach(function (fn) {
+        return fn();
+      });
+      effectCleanupFns = [];
+    }
+
+    return instance;
+  };
+}
+
+var passive = {
+  passive: true
+};
+
+function effect(_ref) {
+  var state = _ref.state,
+      instance = _ref.instance,
+      options = _ref.options;
+  var _options$scroll = options.scroll,
+      scroll = _options$scroll === void 0 ? true : _options$scroll,
+      _options$resize = options.resize,
+      resize = _options$resize === void 0 ? true : _options$resize;
+  var window = getWindow(state.elements.popper);
+  var scrollParents = [].concat(state.scrollParents.reference, state.scrollParents.popper);
+
+  if (scroll) {
+    scrollParents.forEach(function (scrollParent) {
+      scrollParent.addEventListener('scroll', instance.update, passive);
+    });
+  }
+
+  if (resize) {
+    window.addEventListener('resize', instance.update, passive);
+  }
+
+  return function () {
+    if (scroll) {
+      scrollParents.forEach(function (scrollParent) {
+        scrollParent.removeEventListener('scroll', instance.update, passive);
+      });
+    }
+
+    if (resize) {
+      window.removeEventListener('resize', instance.update, passive);
+    }
+  };
+} // eslint-disable-next-line import/no-unused-modules
+
+
+var eventListeners = {
+  name: 'eventListeners',
+  enabled: true,
+  phase: 'write',
+  fn: function fn() {},
+  effect: effect,
+  data: {}
+};
+
+function popperOffsets(_ref) {
+  var state = _ref.state,
+      name = _ref.name;
+  // Offsets are the actual position the popper needs to have to be
+  // properly positioned near its reference element
+  // This is the most basic placement, and will be adjusted by
+  // the modifiers in the next step
+  state.modifiersData[name] = computeOffsets({
+    reference: state.rects.reference,
+    element: state.rects.popper,
+    strategy: 'absolute',
+    placement: state.placement
+  });
+} // eslint-disable-next-line import/no-unused-modules
+
+
+var popperOffsets$1 = {
+  name: 'popperOffsets',
+  enabled: true,
+  phase: 'read',
+  fn: popperOffsets,
+  data: {}
+};
+
+var unsetSides = {
+  top: 'auto',
+  right: 'auto',
+  bottom: 'auto',
+  left: 'auto'
+}; // Round the offsets to the nearest suitable subpixel based on the DPR.
+// Zooming can change the DPR, but it seems to report a value that will
+// cleanly divide the values into the appropriate subpixels.
+
+function roundOffsets(_ref) {
+  var x = _ref.x,
+      y = _ref.y;
+  var win = window;
+  var dpr = win.devicePixelRatio || 1;
+  return {
+    x: Math.round(x * dpr) / dpr || 0,
+    y: Math.round(y * dpr) / dpr || 0
+  };
+}
+
+function mapToStyles(_ref2) {
+  var _Object$assign2;
+
+  var popper = _ref2.popper,
+      popperRect = _ref2.popperRect,
+      placement = _ref2.placement,
+      offsets = _ref2.offsets,
+      position = _ref2.position,
+      gpuAcceleration = _ref2.gpuAcceleration,
+      adaptive = _ref2.adaptive;
+
+  var _roundOffsets = roundOffsets(offsets),
+      x = _roundOffsets.x,
+      y = _roundOffsets.y;
+
+  var hasX = offsets.hasOwnProperty('x');
+  var hasY = offsets.hasOwnProperty('y');
+  var sideX = left;
+  var sideY = top;
+  var win = window;
+
+  if (adaptive) {
+    var offsetParent = getOffsetParent(popper);
+
+    if (offsetParent === getWindow(popper)) {
+      offsetParent = getDocumentElement(popper);
+    } // $FlowFixMe: force type refinement, we compare offsetParent with window above, but Flow doesn't detect it
+
+    /*:: offsetParent = (offsetParent: Element); */
+
+
+    if (placement === top) {
+      sideY = bottom;
+      y -= offsetParent.clientHeight - popperRect.height;
+      y *= gpuAcceleration ? 1 : -1;
+    }
+
+    if (placement === left) {
+      sideX = right;
+      x -= offsetParent.clientWidth - popperRect.width;
+      x *= gpuAcceleration ? 1 : -1;
+    }
+  }
+
+  var commonStyles = Object.assign({
+    position: position
+  }, adaptive && unsetSides);
+
+  if (gpuAcceleration) {
+    var _Object$assign;
+
+    return Object.assign(Object.assign({}, commonStyles), {}, (_Object$assign = {}, _Object$assign[sideY] = hasY ? '0' : '', _Object$assign[sideX] = hasX ? '0' : '', _Object$assign.transform = (win.devicePixelRatio || 1) < 2 ? "translate(" + x + "px, " + y + "px)" : "translate3d(" + x + "px, " + y + "px, 0)", _Object$assign));
+  }
+
+  return Object.assign(Object.assign({}, commonStyles), {}, (_Object$assign2 = {}, _Object$assign2[sideY] = hasY ? y + "px" : '', _Object$assign2[sideX] = hasX ? x + "px" : '', _Object$assign2.transform = '', _Object$assign2));
+}
+
+function computeStyles(_ref3) {
+  var state = _ref3.state,
+      options = _ref3.options;
+  var _options$gpuAccelerat = options.gpuAcceleration,
+      gpuAcceleration = _options$gpuAccelerat === void 0 ? true : _options$gpuAccelerat,
+      _options$adaptive = options.adaptive,
+      adaptive = _options$adaptive === void 0 ? true : _options$adaptive;
+
+  if (process.env.NODE_ENV !== "production") {
+    var transitionProperty = getComputedStyle(state.elements.popper).transitionProperty || '';
+
+    if (adaptive && ['transform', 'top', 'right', 'bottom', 'left'].some(function (property) {
+      return transitionProperty.indexOf(property) >= 0;
+    })) {
+      console.warn(['Popper: Detected CSS transitions on at least one of the following', 'CSS properties: "transform", "top", "right", "bottom", "left".', '\n\n', 'Disable the "computeStyles" modifier\'s `adaptive` option to allow', 'for smooth transitions, or remove these properties from the CSS', 'transition declaration on the popper element if only transitioning', 'opacity or background-color for example.', '\n\n', 'We recommend using the popper element as a wrapper around an inner', 'element that can have any CSS property transitioned for animations.'].join(' '));
+    }
+  }
+
+  var commonStyles = {
+    placement: getBasePlacement(state.placement),
+    popper: state.elements.popper,
+    popperRect: state.rects.popper,
+    gpuAcceleration: gpuAcceleration
+  };
+
+  if (state.modifiersData.popperOffsets != null) {
+    state.styles.popper = Object.assign(Object.assign({}, state.styles.popper), mapToStyles(Object.assign(Object.assign({}, commonStyles), {}, {
+      offsets: state.modifiersData.popperOffsets,
+      position: state.options.strategy,
+      adaptive: adaptive
+    })));
+  }
+
+  if (state.modifiersData.arrow != null) {
+    state.styles.arrow = Object.assign(Object.assign({}, state.styles.arrow), mapToStyles(Object.assign(Object.assign({}, commonStyles), {}, {
+      offsets: state.modifiersData.arrow,
+      position: 'absolute',
+      adaptive: false
+    })));
+  }
+
+  state.attributes.popper = Object.assign(Object.assign({}, state.attributes.popper), {}, {
+    'data-popper-placement': state.placement
+  });
+} // eslint-disable-next-line import/no-unused-modules
+
+
+var computeStyles$1 = {
+  name: 'computeStyles',
+  enabled: true,
+  phase: 'beforeWrite',
+  fn: computeStyles,
+  data: {}
+};
+
+// and applies them to the HTMLElements such as popper and arrow
+
+function applyStyles(_ref) {
+  var state = _ref.state;
+  Object.keys(state.elements).forEach(function (name) {
+    var style = state.styles[name] || {};
+    var attributes = state.attributes[name] || {};
+    var element = state.elements[name]; // arrow is optional + virtual elements
+
+    if (!isHTMLElement(element) || !getNodeName(element)) {
+      return;
+    } // Flow doesn't support to extend this property, but it's the most
+    // effective way to apply styles to an HTMLElement
+    // $FlowFixMe
+
+
+    Object.assign(element.style, style);
+    Object.keys(attributes).forEach(function (name) {
+      var value = attributes[name];
+
+      if (value === false) {
+        element.removeAttribute(name);
+      } else {
+        element.setAttribute(name, value === true ? '' : value);
+      }
+    });
+  });
+}
+
+function effect$1(_ref2) {
+  var state = _ref2.state;
+  var initialStyles = {
+    popper: {
+      position: state.options.strategy,
+      left: '0',
+      top: '0',
+      margin: '0'
+    },
+    arrow: {
+      position: 'absolute'
+    },
+    reference: {}
+  };
+  Object.assign(state.elements.popper.style, initialStyles.popper);
+
+  if (state.elements.arrow) {
+    Object.assign(state.elements.arrow.style, initialStyles.arrow);
+  }
+
+  return function () {
+    Object.keys(state.elements).forEach(function (name) {
+      var element = state.elements[name];
+      var attributes = state.attributes[name] || {};
+      var styleProperties = Object.keys(state.styles.hasOwnProperty(name) ? state.styles[name] : initialStyles[name]); // Set all values to an empty string to unset them
+
+      var style = styleProperties.reduce(function (style, property) {
+        style[property] = '';
+        return style;
+      }, {}); // arrow is optional + virtual elements
+
+      if (!isHTMLElement(element) || !getNodeName(element)) {
+        return;
+      } // Flow doesn't support to extend this property, but it's the most
+      // effective way to apply styles to an HTMLElement
+      // $FlowFixMe
+
+
+      Object.assign(element.style, style);
+      Object.keys(attributes).forEach(function (attribute) {
+        element.removeAttribute(attribute);
+      });
+    });
+  };
+} // eslint-disable-next-line import/no-unused-modules
+
+
+var applyStyles$1 = {
+  name: 'applyStyles',
+  enabled: true,
+  phase: 'write',
+  fn: applyStyles,
+  effect: effect$1,
+  requires: ['computeStyles']
+};
+
+function distanceAndSkiddingToXY(placement, rects, offset) {
+  var basePlacement = getBasePlacement(placement);
+  var invertDistance = [left, top].indexOf(basePlacement) >= 0 ? -1 : 1;
+
+  var _ref = typeof offset === 'function' ? offset(Object.assign(Object.assign({}, rects), {}, {
+    placement: placement
+  })) : offset,
+      skidding = _ref[0],
+      distance = _ref[1];
+
+  skidding = skidding || 0;
+  distance = (distance || 0) * invertDistance;
+  return [left, right].indexOf(basePlacement) >= 0 ? {
+    x: distance,
+    y: skidding
+  } : {
+    x: skidding,
+    y: distance
+  };
+}
+
+function offset(_ref2) {
+  var state = _ref2.state,
+      options = _ref2.options,
+      name = _ref2.name;
+  var _options$offset = options.offset,
+      offset = _options$offset === void 0 ? [0, 0] : _options$offset;
+  var data = placements.reduce(function (acc, placement) {
+    acc[placement] = distanceAndSkiddingToXY(placement, state.rects, offset);
+    return acc;
+  }, {});
+  var _data$state$placement = data[state.placement],
+      x = _data$state$placement.x,
+      y = _data$state$placement.y;
+
+  if (state.modifiersData.popperOffsets != null) {
+    state.modifiersData.popperOffsets.x += x;
+    state.modifiersData.popperOffsets.y += y;
+  }
+
+  state.modifiersData[name] = data;
+} // eslint-disable-next-line import/no-unused-modules
+
+
+var offset$1 = {
+  name: 'offset',
+  enabled: true,
+  phase: 'main',
+  requires: ['popperOffsets'],
+  fn: offset
+};
+
+var hash = {
+  left: 'right',
+  right: 'left',
+  bottom: 'top',
+  top: 'bottom'
+};
+function getOppositePlacement(placement) {
+  return placement.replace(/left|right|bottom|top/g, function (matched) {
+    return hash[matched];
+  });
+}
+
+var hash$1 = {
+  start: 'end',
+  end: 'start'
+};
+function getOppositeVariationPlacement(placement) {
+  return placement.replace(/start|end/g, function (matched) {
+    return hash$1[matched];
+  });
+}
+
+/*:: type OverflowsMap = { [ComputedPlacement]: number }; */
+
+/*;; type OverflowsMap = { [key in ComputedPlacement]: number }; */
+function computeAutoPlacement(state, options) {
+  if (options === void 0) {
+    options = {};
+  }
+
+  var _options = options,
+      placement = _options.placement,
+      boundary = _options.boundary,
+      rootBoundary = _options.rootBoundary,
+      padding = _options.padding,
+      flipVariations = _options.flipVariations,
+      _options$allowedAutoP = _options.allowedAutoPlacements,
+      allowedAutoPlacements = _options$allowedAutoP === void 0 ? placements : _options$allowedAutoP;
+  var variation = getVariation(placement);
+  var placements$1 = variation ? flipVariations ? variationPlacements : variationPlacements.filter(function (placement) {
+    return getVariation(placement) === variation;
+  }) : basePlacements; // $FlowFixMe
+
+  var allowedPlacements = placements$1.filter(function (placement) {
+    return allowedAutoPlacements.indexOf(placement) >= 0;
+  });
+
+  if (allowedPlacements.length === 0) {
+    allowedPlacements = placements$1;
+
+    if (process.env.NODE_ENV !== "production") {
+      console.error(['Popper: The `allowedAutoPlacements` option did not allow any', 'placements. Ensure the `placement` option matches the variation', 'of the allowed placements.', 'For example, "auto" cannot be used to allow "bottom-start".', 'Use "auto-start" instead.'].join(' '));
+    }
+  } // $FlowFixMe: Flow seems to have problems with two array unions...
+
+
+  var overflows = allowedPlacements.reduce(function (acc, placement) {
+    acc[placement] = detectOverflow(state, {
+      placement: placement,
+      boundary: boundary,
+      rootBoundary: rootBoundary,
+      padding: padding
+    })[getBasePlacement(placement)];
+    return acc;
+  }, {});
+  return Object.keys(overflows).sort(function (a, b) {
+    return overflows[a] - overflows[b];
+  });
+}
+
+function getExpandedFallbackPlacements(placement) {
+  if (getBasePlacement(placement) === auto) {
+    return [];
+  }
+
+  var oppositePlacement = getOppositePlacement(placement);
+  return [getOppositeVariationPlacement(placement), oppositePlacement, getOppositeVariationPlacement(oppositePlacement)];
+}
+
+function flip(_ref) {
+  var state = _ref.state,
+      options = _ref.options,
+      name = _ref.name;
+
+  if (state.modifiersData[name]._skip) {
+    return;
+  }
+
+  var _options$mainAxis = options.mainAxis,
+      checkMainAxis = _options$mainAxis === void 0 ? true : _options$mainAxis,
+      _options$altAxis = options.altAxis,
+      checkAltAxis = _options$altAxis === void 0 ? true : _options$altAxis,
+      specifiedFallbackPlacements = options.fallbackPlacements,
+      padding = options.padding,
+      boundary = options.boundary,
+      rootBoundary = options.rootBoundary,
+      altBoundary = options.altBoundary,
+      _options$flipVariatio = options.flipVariations,
+      flipVariations = _options$flipVariatio === void 0 ? true : _options$flipVariatio,
+      allowedAutoPlacements = options.allowedAutoPlacements;
+  var preferredPlacement = state.options.placement;
+  var basePlacement = getBasePlacement(preferredPlacement);
+  var isBasePlacement = basePlacement === preferredPlacement;
+  var fallbackPlacements = specifiedFallbackPlacements || (isBasePlacement || !flipVariations ? [getOppositePlacement(preferredPlacement)] : getExpandedFallbackPlacements(preferredPlacement));
+  var placements = [preferredPlacement].concat(fallbackPlacements).reduce(function (acc, placement) {
+    return acc.concat(getBasePlacement(placement) === auto ? computeAutoPlacement(state, {
+      placement: placement,
+      boundary: boundary,
+      rootBoundary: rootBoundary,
+      padding: padding,
+      flipVariations: flipVariations,
+      allowedAutoPlacements: allowedAutoPlacements
+    }) : placement);
+  }, []);
+  var referenceRect = state.rects.reference;
+  var popperRect = state.rects.popper;
+  var checksMap = new Map();
+  var makeFallbackChecks = true;
+  var firstFittingPlacement = placements[0];
+
+  for (var i = 0; i < placements.length; i++) {
+    var placement = placements[i];
+
+    var _basePlacement = getBasePlacement(placement);
+
+    var isStartVariation = getVariation(placement) === start;
+    var isVertical = [top, bottom].indexOf(_basePlacement) >= 0;
+    var len = isVertical ? 'width' : 'height';
+    var overflow = detectOverflow(state, {
+      placement: placement,
+      boundary: boundary,
+      rootBoundary: rootBoundary,
+      altBoundary: altBoundary,
+      padding: padding
+    });
+    var mainVariationSide = isVertical ? isStartVariation ? right : left : isStartVariation ? bottom : top;
+
+    if (referenceRect[len] > popperRect[len]) {
+      mainVariationSide = getOppositePlacement(mainVariationSide);
+    }
+
+    var altVariationSide = getOppositePlacement(mainVariationSide);
+    var checks = [];
+
+    if (checkMainAxis) {
+      checks.push(overflow[_basePlacement] <= 0);
+    }
+
+    if (checkAltAxis) {
+      checks.push(overflow[mainVariationSide] <= 0, overflow[altVariationSide] <= 0);
+    }
+
+    if (checks.every(function (check) {
+      return check;
+    })) {
+      firstFittingPlacement = placement;
+      makeFallbackChecks = false;
+      break;
+    }
+
+    checksMap.set(placement, checks);
+  }
+
+  if (makeFallbackChecks) {
+    // `2` may be desired in some cases – research later
+    var numberOfChecks = flipVariations ? 3 : 1;
+
+    var _loop = function _loop(_i) {
+      var fittingPlacement = placements.find(function (placement) {
+        var checks = checksMap.get(placement);
+
+        if (checks) {
+          return checks.slice(0, _i).every(function (check) {
+            return check;
+          });
+        }
+      });
+
+      if (fittingPlacement) {
+        firstFittingPlacement = fittingPlacement;
+        return "break";
+      }
+    };
+
+    for (var _i = numberOfChecks; _i > 0; _i--) {
+      var _ret = _loop(_i);
+
+      if (_ret === "break") break;
+    }
+  }
+
+  if (state.placement !== firstFittingPlacement) {
+    state.modifiersData[name]._skip = true;
+    state.placement = firstFittingPlacement;
+    state.reset = true;
+  }
+} // eslint-disable-next-line import/no-unused-modules
+
+
+var flip$1 = {
+  name: 'flip',
+  enabled: true,
+  phase: 'main',
+  fn: flip,
+  requiresIfExists: ['offset'],
+  data: {
+    _skip: false
+  }
+};
+
+function getAltAxis(axis) {
+  return axis === 'x' ? 'y' : 'x';
+}
+
+function within(min, value, max) {
+  return Math.max(min, Math.min(value, max));
+}
+
+function preventOverflow(_ref) {
+  var state = _ref.state,
+      options = _ref.options,
+      name = _ref.name;
+  var _options$mainAxis = options.mainAxis,
+      checkMainAxis = _options$mainAxis === void 0 ? true : _options$mainAxis,
+      _options$altAxis = options.altAxis,
+      checkAltAxis = _options$altAxis === void 0 ? false : _options$altAxis,
+      boundary = options.boundary,
+      rootBoundary = options.rootBoundary,
+      altBoundary = options.altBoundary,
+      padding = options.padding,
+      _options$tether = options.tether,
+      tether = _options$tether === void 0 ? true : _options$tether,
+      _options$tetherOffset = options.tetherOffset,
+      tetherOffset = _options$tetherOffset === void 0 ? 0 : _options$tetherOffset;
+  var overflow = detectOverflow(state, {
+    boundary: boundary,
+    rootBoundary: rootBoundary,
+    padding: padding,
+    altBoundary: altBoundary
+  });
+  var basePlacement = getBasePlacement(state.placement);
+  var variation = getVariation(state.placement);
+  var isBasePlacement = !variation;
+  var mainAxis = getMainAxisFromPlacement(basePlacement);
+  var altAxis = getAltAxis(mainAxis);
+  var popperOffsets = state.modifiersData.popperOffsets;
+  var referenceRect = state.rects.reference;
+  var popperRect = state.rects.popper;
+  var tetherOffsetValue = typeof tetherOffset === 'function' ? tetherOffset(Object.assign(Object.assign({}, state.rects), {}, {
+    placement: state.placement
+  })) : tetherOffset;
+  var data = {
+    x: 0,
+    y: 0
+  };
+
+  if (!popperOffsets) {
+    return;
+  }
+
+  if (checkMainAxis) {
+    var mainSide = mainAxis === 'y' ? top : left;
+    var altSide = mainAxis === 'y' ? bottom : right;
+    var len = mainAxis === 'y' ? 'height' : 'width';
+    var offset = popperOffsets[mainAxis];
+    var min = popperOffsets[mainAxis] + overflow[mainSide];
+    var max = popperOffsets[mainAxis] - overflow[altSide];
+    var additive = tether ? -popperRect[len] / 2 : 0;
+    var minLen = variation === start ? referenceRect[len] : popperRect[len];
+    var maxLen = variation === start ? -popperRect[len] : -referenceRect[len]; // We need to include the arrow in the calculation so the arrow doesn't go
+    // outside the reference bounds
+
+    var arrowElement = state.elements.arrow;
+    var arrowRect = tether && arrowElement ? getLayoutRect(arrowElement) : {
+      width: 0,
+      height: 0
+    };
+    var arrowPaddingObject = state.modifiersData['arrow#persistent'] ? state.modifiersData['arrow#persistent'].padding : getFreshSideObject();
+    var arrowPaddingMin = arrowPaddingObject[mainSide];
+    var arrowPaddingMax = arrowPaddingObject[altSide]; // If the reference length is smaller than the arrow length, we don't want
+    // to include its full size in the calculation. If the reference is small
+    // and near the edge of a boundary, the popper can overflow even if the
+    // reference is not overflowing as well (e.g. virtual elements with no
+    // width or height)
+
+    var arrowLen = within(0, referenceRect[len], arrowRect[len]);
+    var minOffset = isBasePlacement ? referenceRect[len] / 2 - additive - arrowLen - arrowPaddingMin - tetherOffsetValue : minLen - arrowLen - arrowPaddingMin - tetherOffsetValue;
+    var maxOffset = isBasePlacement ? -referenceRect[len] / 2 + additive + arrowLen + arrowPaddingMax + tetherOffsetValue : maxLen + arrowLen + arrowPaddingMax + tetherOffsetValue;
+    var arrowOffsetParent = state.elements.arrow && getOffsetParent(state.elements.arrow);
+    var clientOffset = arrowOffsetParent ? mainAxis === 'y' ? arrowOffsetParent.clientTop || 0 : arrowOffsetParent.clientLeft || 0 : 0;
+    var offsetModifierValue = state.modifiersData.offset ? state.modifiersData.offset[state.placement][mainAxis] : 0;
+    var tetherMin = popperOffsets[mainAxis] + minOffset - offsetModifierValue - clientOffset;
+    var tetherMax = popperOffsets[mainAxis] + maxOffset - offsetModifierValue;
+    var preventedOffset = within(tether ? Math.min(min, tetherMin) : min, offset, tether ? Math.max(max, tetherMax) : max);
+    popperOffsets[mainAxis] = preventedOffset;
+    data[mainAxis] = preventedOffset - offset;
+  }
+
+  if (checkAltAxis) {
+    var _mainSide = mainAxis === 'x' ? top : left;
+
+    var _altSide = mainAxis === 'x' ? bottom : right;
+
+    var _offset = popperOffsets[altAxis];
+
+    var _min = _offset + overflow[_mainSide];
+
+    var _max = _offset - overflow[_altSide];
+
+    var _preventedOffset = within(_min, _offset, _max);
+
+    popperOffsets[altAxis] = _preventedOffset;
+    data[altAxis] = _preventedOffset - _offset;
+  }
+
+  state.modifiersData[name] = data;
+} // eslint-disable-next-line import/no-unused-modules
+
+
+var preventOverflow$1 = {
+  name: 'preventOverflow',
+  enabled: true,
+  phase: 'main',
+  fn: preventOverflow,
+  requiresIfExists: ['offset']
+};
+
+function arrow(_ref) {
+  var _state$modifiersData$;
+
+  var state = _ref.state,
+      name = _ref.name;
+  var arrowElement = state.elements.arrow;
+  var popperOffsets = state.modifiersData.popperOffsets;
+  var basePlacement = getBasePlacement(state.placement);
+  var axis = getMainAxisFromPlacement(basePlacement);
+  var isVertical = [left, right].indexOf(basePlacement) >= 0;
+  var len = isVertical ? 'height' : 'width';
+
+  if (!arrowElement || !popperOffsets) {
+    return;
+  }
+
+  var paddingObject = state.modifiersData[name + "#persistent"].padding;
+  var arrowRect = getLayoutRect(arrowElement);
+  var minProp = axis === 'y' ? top : left;
+  var maxProp = axis === 'y' ? bottom : right;
+  var endDiff = state.rects.reference[len] + state.rects.reference[axis] - popperOffsets[axis] - state.rects.popper[len];
+  var startDiff = popperOffsets[axis] - state.rects.reference[axis];
+  var arrowOffsetParent = getOffsetParent(arrowElement);
+  var clientSize = arrowOffsetParent ? axis === 'y' ? arrowOffsetParent.clientHeight || 0 : arrowOffsetParent.clientWidth || 0 : 0;
+  var centerToReference = endDiff / 2 - startDiff / 2; // Make sure the arrow doesn't overflow the popper if the center point is
+  // outside of the popper bounds
+
+  var min = paddingObject[minProp];
+  var max = clientSize - arrowRect[len] - paddingObject[maxProp];
+  var center = clientSize / 2 - arrowRect[len] / 2 + centerToReference;
+  var offset = within(min, center, max); // Prevents breaking syntax highlighting...
+
+  var axisProp = axis;
+  state.modifiersData[name] = (_state$modifiersData$ = {}, _state$modifiersData$[axisProp] = offset, _state$modifiersData$.centerOffset = offset - center, _state$modifiersData$);
+}
+
+function effect$2(_ref2) {
+  var state = _ref2.state,
+      options = _ref2.options,
+      name = _ref2.name;
+  var _options$element = options.element,
+      arrowElement = _options$element === void 0 ? '[data-popper-arrow]' : _options$element,
+      _options$padding = options.padding,
+      padding = _options$padding === void 0 ? 0 : _options$padding;
+
+  if (arrowElement == null) {
+    return;
+  } // CSS selector
+
+
+  if (typeof arrowElement === 'string') {
+    arrowElement = state.elements.popper.querySelector(arrowElement);
+
+    if (!arrowElement) {
+      return;
+    }
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    if (!isHTMLElement(arrowElement)) {
+      console.error(['Popper: "arrow" element must be an HTMLElement (not an SVGElement).', 'To use an SVG arrow, wrap it in an HTMLElement that will be used as', 'the arrow.'].join(' '));
+    }
+  }
+
+  if (!contains(state.elements.popper, arrowElement)) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error(['Popper: "arrow" modifier\'s `element` must be a child of the popper', 'element.'].join(' '));
+    }
+
+    return;
+  }
+
+  state.elements.arrow = arrowElement;
+  state.modifiersData[name + "#persistent"] = {
+    padding: mergePaddingObject(typeof padding !== 'number' ? padding : expandToHashMap(padding, basePlacements))
+  };
+} // eslint-disable-next-line import/no-unused-modules
+
+
+var arrow$1 = {
+  name: 'arrow',
+  enabled: true,
+  phase: 'main',
+  fn: arrow,
+  effect: effect$2,
+  requires: ['popperOffsets'],
+  requiresIfExists: ['preventOverflow']
+};
+
+function getSideOffsets(overflow, rect, preventedOffsets) {
+  if (preventedOffsets === void 0) {
+    preventedOffsets = {
+      x: 0,
+      y: 0
+    };
+  }
+
+  return {
+    top: overflow.top - rect.height - preventedOffsets.y,
+    right: overflow.right - rect.width + preventedOffsets.x,
+    bottom: overflow.bottom - rect.height + preventedOffsets.y,
+    left: overflow.left - rect.width - preventedOffsets.x
+  };
+}
+
+function isAnySideFullyClipped(overflow) {
+  return [top, right, bottom, left].some(function (side) {
+    return overflow[side] >= 0;
+  });
+}
+
+function hide(_ref) {
+  var state = _ref.state,
+      name = _ref.name;
+  var referenceRect = state.rects.reference;
+  var popperRect = state.rects.popper;
+  var preventedOffsets = state.modifiersData.preventOverflow;
+  var referenceOverflow = detectOverflow(state, {
+    elementContext: 'reference'
+  });
+  var popperAltOverflow = detectOverflow(state, {
+    altBoundary: true
+  });
+  var referenceClippingOffsets = getSideOffsets(referenceOverflow, referenceRect);
+  var popperEscapeOffsets = getSideOffsets(popperAltOverflow, popperRect, preventedOffsets);
+  var isReferenceHidden = isAnySideFullyClipped(referenceClippingOffsets);
+  var hasPopperEscaped = isAnySideFullyClipped(popperEscapeOffsets);
+  state.modifiersData[name] = {
+    referenceClippingOffsets: referenceClippingOffsets,
+    popperEscapeOffsets: popperEscapeOffsets,
+    isReferenceHidden: isReferenceHidden,
+    hasPopperEscaped: hasPopperEscaped
+  };
+  state.attributes.popper = Object.assign(Object.assign({}, state.attributes.popper), {}, {
+    'data-popper-reference-hidden': isReferenceHidden,
+    'data-popper-escaped': hasPopperEscaped
+  });
+} // eslint-disable-next-line import/no-unused-modules
+
+
+var hide$1 = {
+  name: 'hide',
+  enabled: true,
+  phase: 'main',
+  requiresIfExists: ['preventOverflow'],
+  fn: hide
+};
+
+var defaultModifiers = [eventListeners, popperOffsets$1, computeStyles$1, applyStyles$1, offset$1, flip$1, preventOverflow$1, arrow$1, hide$1];
+var createPopper = /*#__PURE__*/popperGenerator({
+  defaultModifiers: defaultModifiers
+}); // eslint-disable-next-line import/no-unused-modules
+
+exports.createPopper = createPopper;
+exports.defaultModifiers = defaultModifiers;
+exports.detectOverflow = detectOverflow;
+exports.popperGenerator = popperGenerator;
+
+
+}).call(this,require('_process'))
+},{"_process":18}],2:[function(require,module,exports){
+/**
+ * @overview NPM Module index: include all the core modules, I18n files will be loaded on the fly.
+ * @author Gregory Wild-Smith <gregory@wild-smith.com>
+ */
+require("./src/core/i18n.js");
+require("./src/core/core.js");
+require("./src/core/core-prototypes.js");
+require("./src/core/sugarpak.js");
+require("./src/core/format_parser.js");
+require("./src/core/parsing_operators.js");
+require("./src/core/parsing_translator.js");
+require("./src/core/parsing_grammar.js");
+require("./src/core/parser.js");
+require("./src/core/extras.js");
+require("./src/core/time_period.js");
+require("./src/core/time_span.js");
+/*
+ * Notice that there is no model.export or exports. This is not required as it modifies the Date object and it's prototypes.
+ */
+},{"./src/core/core-prototypes.js":3,"./src/core/core.js":4,"./src/core/extras.js":5,"./src/core/format_parser.js":6,"./src/core/i18n.js":7,"./src/core/parser.js":8,"./src/core/parsing_grammar.js":9,"./src/core/parsing_operators.js":10,"./src/core/parsing_translator.js":11,"./src/core/sugarpak.js":12,"./src/core/time_period.js":13,"./src/core/time_span.js":14}],3:[function(require,module,exports){
+(function () {
+	var $D = Date,
+		$P = $D.prototype,
+		p = function (s, l) {
+			if (!l) {
+				l = 2;
+			}
+			return ("000" + s).slice(l * -1);
+		};
+
+	var validateConfigObject = function (obj) {
+		var result = {}, self = this, prop, testFunc;
+		testFunc = function (prop, func, value) {
+			if (prop === "day") {
+				var month = (obj.month !== undefined) ? obj.month : self.getMonth();
+				var year = (obj.year !== undefined) ? obj.year : self.getFullYear();
+				return $D[func](value, year, month);
+			} else {
+				return $D[func](value);
+			}
+		};
+		for (prop in obj) {
+			if (hasOwnProperty.call(obj, prop)) {
+				var func = "validate" + prop.charAt(0).toUpperCase() + prop.slice(1);
+
+				if ($D[func] && obj[prop] !== null && testFunc(prop, func, obj[prop])) {
+					result[prop] = obj[prop];
+				}
+			}
+		}
+		return result;
+	};
+	/**
+	 * Resets the time of this Date object to 12:00 AM (00:00), which is the start of the day.
+	 * @param {Boolean}  .clone() this date instance before clearing Time
+	 * @return {Date}    this
+	 */
+	$P.clearTime = function () {
+		this.setHours(0);
+		this.setMinutes(0);
+		this.setSeconds(0);
+		this.setMilliseconds(0);
+		return this;
+	};
+
+	/**
+	 * Resets the time of this Date object to the current time ('now').
+	 * @return {Date}    this
+	 */
+	$P.setTimeToNow = function () {
+		var n = new Date();
+		this.setHours(n.getHours());
+		this.setMinutes(n.getMinutes());
+		this.setSeconds(n.getSeconds());
+		this.setMilliseconds(n.getMilliseconds());
+		return this;
+	};
+	/**
+	 * Returns a new Date object that is an exact date and time copy of the original instance.
+	 * @return {Date}    A new Date instance
+	 */
+	$P.clone = function () {
+		return new Date(this.getTime());
+	};
+
+	/**
+	 * Compares this instance to a Date object and returns an number indication of their relative values.  
+	 * @param {Date}     Date object to compare [Required]
+	 * @return {Number}  -1 = this is lessthan date. 0 = values are equal. 1 = this is greaterthan date.
+	 */
+	$P.compareTo = function (date) {
+		return Date.compare(this, date);
+	};
+
+	/**
+	 * Compares this instance to another Date object and returns true if they are equal.  
+	 * @param {Date}     Date object to compare. If no date to compare, new Date() [now] is used.
+	 * @return {Boolean} true if dates are equal. false if they are not equal.
+	 */
+	$P.equals = function (date) {
+		return Date.equals(this, (date !== undefined ? date : new Date()));
+	};
+
+	/**
+	 * Determines if this instance is between a range of two dates or equal to either the start or end dates.
+	 * @param {Date}     Start of range [Required]
+	 * @param {Date}     End of range [Required]
+	 * @return {Boolean} true is this is between or equal to the start and end dates, else false
+	 */
+	$P.between = function (start, end) {
+		return this.getTime() >= start.getTime() && this.getTime() <= end.getTime();
+	};
+
+	/**
+	 * Determines if this date occurs after the date to compare to.
+	 * @param {Date}     Date object to compare. If no date to compare, new Date() ("now") is used.
+	 * @return {Boolean} true if this date instance is greater than the date to compare to (or "now"), otherwise false.
+	 */
+	$P.isAfter = function (date) {
+		return this.compareTo(date || new Date()) === 1;
+	};
+
+	/**
+	 * Determines if this date occurs before the date to compare to.
+	 * @param {Date}     Date object to compare. If no date to compare, new Date() ("now") is used.
+	 * @return {Boolean} true if this date instance is less than the date to compare to (or "now").
+	 */
+	$P.isBefore = function (date) {
+		return (this.compareTo(date || new Date()) === -1);
+	};
+
+	/**
+	 * Determines if the current Date instance occurs today.
+	 * @return {Boolean} true if this date instance is 'today', otherwise false.
+	 */
+	
+	/**
+	 * Determines if the current Date instance occurs on the same Date as the supplied 'date'. 
+	 * If no 'date' to compare to is provided, the current Date instance is compared to 'today'. 
+	 * @param {date}     Date object to compare. If no date to compare, the current Date ("now") is used.
+	 * @return {Boolean} true if this Date instance occurs on the same Day as the supplied 'date'.
+	 */
+	$P.isToday = $P.isSameDay = function (date) {
+		return this.clone().clearTime().equals((date || new Date()).clone().clearTime());
+	};
+	
+	/**
+	 * Adds the specified number of milliseconds to this instance. 
+	 * @param {Number}   The number of milliseconds to add. The number can be positive or negative [Required]
+	 * @return {Date}    this
+	 */
+	$P.addMilliseconds = function (value) {
+		if (!value) { return this; }
+		this.setTime(this.getTime() + value * 1);
+		return this;
+	};
+
+	/**
+	 * Adds the specified number of seconds to this instance. 
+	 * @param {Number}   The number of seconds to add. The number can be positive or negative [Required]
+	 * @return {Date}    this
+	 */
+	$P.addSeconds = function (value) {
+		if (!value) { return this; }
+		return this.addMilliseconds(value * 1000);
+	};
+
+	/**
+	 * Adds the specified number of seconds to this instance. 
+	 * @param {Number}   The number of seconds to add. The number can be positive or negative [Required]
+	 * @return {Date}    this
+	 */
+	$P.addMinutes = function (value) {
+		if (!value) { return this; }
+		return this.addMilliseconds(value * 60000); // 60*1000
+	};
+
+	/**
+	 * Adds the specified number of hours to this instance. 
+	 * @param {Number}   The number of hours to add. The number can be positive or negative [Required]
+	 * @return {Date}    this
+	 */
+	$P.addHours = function (value) {
+		if (!value) { return this; }
+		return this.addMilliseconds(value * 3600000); // 60*60*1000
+	};
+
+	/**
+	 * Adds the specified number of days to this instance. 
+	 * @param {Number}   The number of days to add. The number can be positive or negative [Required]
+	 * @return {Date}    this
+	 */
+	$P.addDays = function (value) {
+		if (!value) { return this; }
+		this.setDate(this.getDate() + value * 1);
+		return this;
+	};
+
+	/**
+	 * Adds the specified number of weekdays (ie - not sat or sun) to this instance. 
+	 * @param {Number}   The number of days to add. The number can be positive or negative [Required]
+	 * @return {Date}    this
+	 */
+	$P.addWeekdays = function (value) {
+		if (!value) { return this; }
+		var day = this.getDay();
+		var weeks = (Math.ceil(Math.abs(value)/7));
+		if (day === 0 || day === 6) {
+			if (value > 0) {
+				this.next().monday();
+				this.addDays(-1);
+				day = this.getDay();
+			}
+		}
+
+		if (value < 0) {
+			while (value < 0) {
+				this.addDays(-1);
+				day = this.getDay();
+				if (day !== 0 && day !== 6) {
+					value++;
+				}
+			}
+			return this;
+		} else if (value > 5 || (6-day) <= value) {
+			value = value + (weeks * 2);
+		}
+
+		return this.addDays(value);
+	};
+
+	/**
+	 * Adds the specified number of weeks to this instance. 
+	 * @param {Number}   The number of weeks to add. The number can be positive or negative [Required]
+	 * @return {Date}    this
+	 */
+	$P.addWeeks = function (value) {
+		if (!value) { return this; }
+		return this.addDays(value * 7);
+	};
+
+
+	/**
+	 * Adds the specified number of months to this instance. 
+	 * @param {Number}   The number of months to add. The number can be positive or negative [Required]
+	 * @return {Date}    this
+	 */
+	$P.addMonths = function (value) {
+		if (!value) { return this; }
+		var n = this.getDate();
+		this.setDate(1);
+		this.setMonth(this.getMonth() + value * 1);
+		this.setDate(Math.min(n, $D.getDaysInMonth(this.getFullYear(), this.getMonth())));
+		return this;
+	};
+
+	$P.addQuarters = function (value) {
+		if (!value) { return this; }
+		// note this will take you to the same point in the quarter as you are now.
+		// i.e. - if you are 15 days into the quarter you'll be 15 days into the resulting one.
+		// bonus: this allows adding fractional quarters
+		return this.addMonths(value * 3);
+	};
+
+	/**
+	 * Adds the specified number of years to this instance. 
+	 * @param {Number}   The number of years to add. The number can be positive or negative [Required]
+	 * @return {Date}    this
+	 */
+	$P.addYears = function (value) {
+		if (!value) { return this; }
+		return this.addMonths(value * 12);
+	};
+
+	/**
+	 * Adds (or subtracts) to the value of the years, months, weeks, days, hours, minutes, seconds, milliseconds of the date instance using given configuration object. Positive and Negative values allowed.
+	 * Example
+	<pre><code>
+	Date.today().add( { days: 1, months: 1 } )
+	 
+	new Date().add( { years: -1 } )
+	</code></pre> 
+	 * @param {Object}   Configuration object containing attributes (months, days, etc.)
+	 * @return {Date}    this
+	 */
+	$P.add = function (config) {
+		if (typeof config === "number") {
+			this._orient = config;
+			return this;
+		}
+		
+		var x = config;
+
+		if (x.day) {
+			// If we should be a different date than today (eg: for 'tomorrow -1d', etc).
+			// Should only effect parsing, not direct usage (eg, Finish and FinishExact)
+			if ((x.day - this.getDate()) !== 0) {
+				this.setDate(x.day);
+			}
+		}
+		if (x.milliseconds) {
+			this.addMilliseconds(x.milliseconds);
+		}
+		if (x.seconds) {
+			this.addSeconds(x.seconds);
+		}
+		if (x.minutes) {
+			this.addMinutes(x.minutes);
+		}
+		if (x.hours) {
+			this.addHours(x.hours);
+		}
+		if (x.weeks) {
+			this.addWeeks(x.weeks);
+		}
+		if (x.months) {
+			this.addMonths(x.months);
+		}
+		if (x.years) {
+			this.addYears(x.years);
+		}
+		if (x.days) {
+			this.addDays(x.days);
+		}
+		return this;
+	};
+	
+	/**
+	 * Get the week number. Week one (1) is the week which contains the first Thursday of the year. Monday is considered the first day of the week.
+	 * The .getWeek() function does NOT convert the date to UTC. The local datetime is used. 
+	 * Please use .getISOWeek() to get the week of the UTC converted date.
+	 * @return {Number}  1 to 53
+	 */
+	$P.getWeek = function (utc) {
+		// Create a copy of this date object  
+		var self, target = new Date(this.valueOf());
+		if (utc) {
+			target.addMinutes(target.getTimezoneOffset());
+			self = target.clone();
+		} else {
+			self = this;
+		}
+		// ISO week date weeks start on monday  
+		// so correct the day number  
+		var dayNr = (self.getDay() + 6) % 7;
+		// ISO 8601 states that week 1 is the week  
+		// with the first thursday of that year.  
+		// Set the target date to the thursday in the target week  
+		target.setDate(target.getDate() - dayNr + 3);
+		// Store the millisecond value of the target date  
+		var firstThursday = target.valueOf();
+		// Set the target to the first thursday of the year  
+		// First set the target to january first  
+		target.setMonth(0, 1);
+		// Not a thursday? Correct the date to the next thursday  
+		if (target.getDay() !== 4) {
+			target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+		}
+		// The weeknumber is the number of weeks between the   
+		// first thursday of the year and the thursday in the target week  
+		return 1 + Math.ceil((firstThursday - target) / 604800000); // 604800000 = 7 * 24 * 3600 * 1000  
+	};
+	
+	/**
+	 * Get the ISO 8601 week number. Week one ("01") is the week which contains the first Thursday of the year. Monday is considered the first day of the week.
+	 * The .getISOWeek() function does convert the date to it's UTC value. Please use .getWeek() to get the week of the local date.
+	 * @return {String}  "01" to "53"
+	 */
+	$P.getISOWeek = function () {
+		return p(this.getWeek(true));
+	};
+
+	/**
+	 * Moves the date to Monday of the week set. Week one (1) is the week which contains the first Thursday of the year.
+	 * @param {Number}   A Number (1 to 53) that represents the week of the year.
+	 * @return {Date}    this
+	 */
+	$P.setWeek = function (n) {
+		if ((n - this.getWeek()) === 0) {
+			if (this.getDay() !== 1) {
+				return this.moveToDayOfWeek(1, (this.getDay() > 1 ? -1 : 1));
+			} else {
+				return this;
+			}
+		} else {
+			return this.moveToDayOfWeek(1, (this.getDay() > 1 ? -1 : 1)).addWeeks(n - this.getWeek());
+		}
+	};
+
+	$P.setQuarter = function (qtr) {
+		var month = Math.abs(((qtr-1) * 3) + 1);
+		return this.setMonth(month, 1);
+	};
+
+	$P.getQuarter = function () {
+		return Date.getQuarter(this);
+	};
+
+	$P.getDaysLeftInQuarter = function () {
+		return Date.getDaysLeftInQuarter(this);
+	};
+
+	/**
+	 * Moves the date to the next n'th occurrence of the dayOfWeek starting from the beginning of the month. The number (-1) is a magic number and will return the last occurrence of the dayOfWeek in the month.
+	 * @param {Number}   The dayOfWeek to move to
+	 * @param {Number}   The n'th occurrence to move to. Use (-1) to return the last occurrence in the month
+	 * @return {Date}    this
+	 */
+	$P.moveToNthOccurrence = function (dayOfWeek, occurrence) {
+		if (dayOfWeek === "Weekday") {
+			if (occurrence > 0) {
+				this.moveToFirstDayOfMonth();
+				if (this.is().weekday()) {
+					occurrence -= 1;
+				}
+			} else if (occurrence < 0) {
+				this.moveToLastDayOfMonth();
+				if (this.is().weekday()) {
+					occurrence += 1;
+				}
+			} else {
+				return this;
+			}
+			return this.addWeekdays(occurrence);
+		}
+		var shift = 0;
+		if (occurrence > 0) {
+			shift = occurrence - 1;
+		}
+		else if (occurrence === -1) {
+			this.moveToLastDayOfMonth();
+			if (this.getDay() !== dayOfWeek) {
+				this.moveToDayOfWeek(dayOfWeek, -1);
+			}
+			return this;
+		}
+		return this.moveToFirstDayOfMonth().addDays(-1).moveToDayOfWeek(dayOfWeek, +1).addWeeks(shift);
+	};
+
+
+	var moveToN = function (getFunc, addFunc, nVal) {
+		return function (value, orient) {
+			var diff = (value - this[getFunc]() + nVal * (orient || +1)) % nVal;
+			return this[addFunc]((diff === 0) ? diff += nVal * (orient || +1) : diff);
+		};
+	};
+	/**
+	 * Move to the next or last dayOfWeek based on the orient value.
+	 * @param {Number}   The dayOfWeek to move to
+	 * @param {Number}   Forward (+1) or Back (-1). Defaults to +1. [Optional]
+	 * @return {Date}    this
+	 */
+	$P.moveToDayOfWeek = moveToN("getDay", "addDays", 7);
+	/**
+	 * Move to the next or last month based on the orient value.
+	 * @param {Number}   The month to move to. 0 = January, 11 = December
+	 * @param {Number}   Forward (+1) or Back (-1). Defaults to +1. [Optional]
+	 * @return {Date}    this
+	 */
+	$P.moveToMonth = moveToN("getMonth", "addMonths", 12);
+	/**
+	 * Get the Ordinate of the current day ("th", "st", "rd").
+	 * @return {String} 
+	 */
+	$P.getOrdinate = function () {
+		var num = this.getDate();
+		return ord(num);
+	};
+	/**
+	 * Get the Ordinal day (numeric day number) of the year, adjusted for leap year.
+	 * @return {Number} 1 through 365 (366 in leap years)
+	 */
+	$P.getOrdinalNumber = function () {
+		return Math.ceil((this.clone().clearTime() - new Date(this.getFullYear(), 0, 1)) / 86400000) + 1;
+	};
+
+	/**
+	 * Get the time zone abbreviation of the current date.
+	 * @return {String} The abbreviated time zone name (e.g. "EST")
+	 */
+	$P.getTimezone = function () {
+		return $D.getTimezoneAbbreviation(this.getUTCOffset(), this.isDaylightSavingTime());
+	};
+
+	$P.setTimezoneOffset = function (offset) {
+		var here = this.getTimezoneOffset(), there = Number(offset) * -6 / 10;
+		return (there || there === 0) ? this.addMinutes(there - here) : this;
+	};
+
+	$P.setTimezone = function (offset) {
+		return this.setTimezoneOffset($D.getTimezoneOffset(offset));
+	};
+
+	/**
+	 * Indicates whether Daylight Saving Time is observed in the current time zone.
+	 * @return {Boolean} true|false
+	 */
+	$P.hasDaylightSavingTime = function () {
+		return (Date.today().set({month: 0, day: 1}).getTimezoneOffset() !== Date.today().set({month: 6, day: 1}).getTimezoneOffset());
+	};
+	
+	/**
+	 * Indicates whether this Date instance is within the Daylight Saving Time range for the current time zone.
+	 * @return {Boolean} true|false
+	 */
+	$P.isDaylightSavingTime = function () {
+		return Date.today().set({month: 0, day: 1}).getTimezoneOffset() !== this.getTimezoneOffset();
+	};
+
+	/**
+	 * Get the offset from UTC of the current date.
+	 * @return {String} The 4-character offset string prefixed with + or - (e.g. "-0500")
+	 */
+	$P.getUTCOffset = function (offset) {
+		var n = (offset || this.getTimezoneOffset()) * -10 / 6, r;
+		if (n < 0) {
+			r = (n - 10000).toString();
+			return r.charAt(0) + r.substr(2);
+		} else {
+			r = (n + 10000).toString();
+			return "+" + r.substr(1);
+		}
+	};
+
+	/**
+	 * Returns the number of milliseconds between this date and date.
+	 * @param {Date} Defaults to now
+	 * @return {Number} The diff in milliseconds
+	 */
+	$P.getElapsed = function (date) {
+		return (date || new Date()) - this;
+	};
+
+	/**
+	 * Set the value of year, month, day, hour, minute, second, millisecond of date instance using given configuration object.
+	 * Example
+	<pre><code>
+	Date.today().set( { day: 20, month: 1 } )
+
+	new Date().set( { millisecond: 0 } )
+	</code></pre>
+	 * 
+	 * @param {Object}   Configuration object containing attributes (month, day, etc.)
+	 * @return {Date}    this
+	 */
+	$P.set = function (config) {
+		config = validateConfigObject.call(this, config);
+		var key;
+		for (key in config) {
+			if (hasOwnProperty.call(config, key)) {
+				var name = key.charAt(0).toUpperCase() + key.slice(1);
+				var addFunc, getFunc;
+				if (key !== "week" && key !== "month" && key !== "timezone" && key !== "timezoneOffset") {
+					name += "s";
+				}
+				addFunc = "add" + name;
+				getFunc = "get" + name;
+				if (key === "month") {
+					addFunc = addFunc + "s";
+				} else if (key === "year"){
+					getFunc = "getFullYear";
+				}
+				if (key !== "day" && key !== "timezone" && key !== "timezoneOffset"  && key !== "week" &&  key !== "hour") {
+						this[addFunc](config[key] - this[getFunc]());
+				} else if ( key === "timezone"|| key === "timezoneOffset" || key === "week" || key === "hour") {
+					this["set"+name](config[key]);
+				}
+			}
+		}
+		// day has to go last because you can't validate the day without first knowing the month
+		if (config.day) {
+			this.addDays(config.day - this.getDate());
+		}
+		
+		return this;
+	};
+
+	/**
+	 * Moves the date to the first day of the month.
+	 * @return {Date}    this
+	 */
+	$P.moveToFirstDayOfMonth = function () {
+		return this.set({ day: 1 });
+	};
+
+	/**
+	 * Moves the date to the last day of the month.
+	 * @return {Date}    this
+	 */
+	$P.moveToLastDayOfMonth = function () {
+		return this.set({ day: $D.getDaysInMonth(this.getFullYear(), this.getMonth())});
+	};
+
+
+	/**
+	 * Converts the value of the current Date object to its equivalent string representation.
+	 * Format Specifiers
+	 * CUSTOM DATE AND TIME FORMAT STRINGS
+	 * Format  Description                                                                  Example
+	 * ------  ---------------------------------------------------------------------------  -----------------------
+	 * s      The seconds of the minute between 0-59.                                      "0" to "59"
+	 * ss     The seconds of the minute with leading zero if required.                     "00" to "59"
+	 * 
+	 * m      The minute of the hour between 0-59.                                         "0"  or "59"
+	 * mm     The minute of the hour with leading zero if required.                        "00" or "59"
+	 * 
+	 * h      The hour of the day between 1-12.                                            "1"  to "12"
+	 * hh     The hour of the day with leading zero if required.                           "01" to "12"
+	 * 
+	 * H      The hour of the day between 0-23.                                            "0"  to "23"
+	 * HH     The hour of the day with leading zero if required.                           "00" to "23"
+	 * 
+	 * d      The day of the month between 1 and 31.                                       "1"  to "31"
+	 * dd     The day of the month with leading zero if required.                          "01" to "31"
+	 * ddd    Abbreviated day name. Date.CultureInfo.abbreviatedDayNames.                                "Mon" to "Sun" 
+	 * dddd   The full day name. Date.CultureInfo.dayNames.                                              "Monday" to "Sunday"
+	 * 
+	 * M      The month of the year between 1-12.                                          "1" to "12"
+	 * MM     The month of the year with leading zero if required.                         "01" to "12"
+	 * MMM    Abbreviated month name. Date.CultureInfo.abbreviatedMonthNames.                            "Jan" to "Dec"
+	 * MMMM   The full month name. Date.CultureInfo.monthNames.                                          "January" to "December"
+	 *
+	 * yy     The year as a two-digit number.                                              "99" or "08"
+	 * yyyy   The full four digit year.                                                    "1999" or "2008"
+	 * 
+	 * t      Displays the first character of the A.M./P.M. designator.                    "A" or "P"
+	 *		Date.CultureInfo.amDesignator or Date.CultureInfo.pmDesignator
+	 * tt     Displays the A.M./P.M. designator.                                           "AM" or "PM"
+	 *		Date.CultureInfo.amDesignator or Date.CultureInfo.pmDesignator
+	 * 
+	 * S      The ordinal suffix ("st, "nd", "rd" or "th") of the current day.            "st, "nd", "rd" or "th"
+	 *
+	 * STANDARD DATE AND TIME FORMAT STRINGS
+	 * Format  Description                                                                  Example
+	 *------  ---------------------------------------------------------------------------  -----------------------
+	 * d      The CultureInfo shortDate Format Pattern                                     "M/d/yyyy"
+	 * D      The CultureInfo longDate Format Pattern                                      "dddd, MMMM dd, yyyy"
+	 * F      The CultureInfo fullDateTime Format Pattern                                  "dddd, MMMM dd, yyyy h:mm:ss tt"
+	 * m      The CultureInfo monthDay Format Pattern                                      "MMMM dd"
+	 * r      The CultureInfo rfc1123 Format Pattern                                       "ddd, dd MMM yyyy HH:mm:ss GMT"
+	 * s      The CultureInfo sortableDateTime Format Pattern                              "yyyy-MM-ddTHH:mm:ss"
+	 * t      The CultureInfo shortTime Format Pattern                                     "h:mm tt"
+	 * T      The CultureInfo longTime Format Pattern                                      "h:mm:ss tt"
+	 * u      The CultureInfo universalSortableDateTime Format Pattern                     "yyyy-MM-dd HH:mm:ssZ"
+	 * y      The CultureInfo yearMonth Format Pattern                                     "MMMM, yyyy"
+	 *
+	 * @param {String}   A format string consisting of one or more format spcifiers [Optional].
+	 * @return {String}  A string representation of the current Date object.
+	 */
+	
+	var ord = function (n) {
+		switch (n * 1) {
+		case 1:
+		case 21:
+		case 31:
+			return "st";
+		case 2:
+		case 22:
+			return "nd";
+		case 3:
+		case 23:
+			return "rd";
+		default:
+			return "th";
+		}
+	};
+	var parseStandardFormats = function (format) {
+		var y, c = Date.CultureInfo.formatPatterns;
+		switch (format) {
+			case "d":
+				return this.toString(c.shortDate);
+			case "D":
+				return this.toString(c.longDate);
+			case "F":
+				return this.toString(c.fullDateTime);
+			case "m":
+				return this.toString(c.monthDay);
+			case "r":
+			case "R":
+				y = this.clone().addMinutes(this.getTimezoneOffset());
+				return y.toString(c.rfc1123) + " GMT";
+			case "s":
+				return this.toString(c.sortableDateTime);
+			case "t":
+				return this.toString(c.shortTime);
+			case "T":
+				return this.toString(c.longTime);
+			case "u":
+				y = this.clone().addMinutes(this.getTimezoneOffset());
+				return y.toString(c.universalSortableDateTime);
+			case "y":
+				return this.toString(c.yearMonth);
+			default:
+				return false;
+		}
+	};
+	var parseFormatStringsClosure = function (context) {
+		return function (m) {
+			if (m.charAt(0) === "\\") {
+				return m.replace("\\", "");
+			}
+			switch (m) {
+				case "hh":
+					return p(context.getHours() < 13 ? (context.getHours() === 0 ? 12 : context.getHours()) : (context.getHours() - 12));
+				case "h":
+					return context.getHours() < 13 ? (context.getHours() === 0 ? 12 : context.getHours()) : (context.getHours() - 12);
+				case "HH":
+					return p(context.getHours());
+				case "H":
+					return context.getHours();
+				case "mm":
+					return p(context.getMinutes());
+				case "m":
+					return context.getMinutes();
+				case "ss":
+					return p(context.getSeconds());
+				case "s":
+					return context.getSeconds();
+				case "yyyy":
+					return p(context.getFullYear(), 4);
+				case "yy":
+					return p(context.getFullYear());
+				case "y":
+					return context.getFullYear();
+				case "E":
+				case "dddd":
+					return Date.CultureInfo.dayNames[context.getDay()];
+				case "ddd":
+					return Date.CultureInfo.abbreviatedDayNames[context.getDay()];
+				case "dd":
+					return p(context.getDate());
+				case "d":
+					return context.getDate();
+				case "MMMM":
+					return Date.CultureInfo.monthNames[context.getMonth()];
+				case "MMM":
+					return Date.CultureInfo.abbreviatedMonthNames[context.getMonth()];
+				case "MM":
+					return p((context.getMonth() + 1));
+				case "M":
+					return context.getMonth() + 1;
+				case "t":
+					return context.getHours() < 12 ? Date.CultureInfo.amDesignator.substring(0, 1) : Date.CultureInfo.pmDesignator.substring(0, 1);
+				case "tt":
+					return context.getHours() < 12 ? Date.CultureInfo.amDesignator : Date.CultureInfo.pmDesignator;
+				case "S":
+					return ord(context.getDate());
+				case "W":
+					return context.getWeek();
+				case "WW":
+					return context.getISOWeek();
+				case "Q":
+					return "Q" + context.getQuarter();
+				case "q":
+					return String(context.getQuarter());
+				case "z":
+					return context.getTimezone();
+				case "Z":
+				case "X":
+					return Date.getTimezoneOffset(context.getTimezone());
+				case "ZZ": // Timezone offset in seconds
+					return context.getTimezoneOffset() * -60;
+				case "u":
+					return context.getDay();
+				case "L":
+					return ($D.isLeapYear(context.getFullYear())) ? 1 : 0;
+				case "B":
+					// Swatch Internet Time (.beats)
+					return "@"+((context.getUTCSeconds() + (context.getUTCMinutes()*60) + ((context.getUTCHours()+1)*3600))/86.4);
+				default:
+					return m;
+			}
+		};
+	};
+	$P.toString = function (format, ignoreStandards) {
+		
+		// Standard Date and Time Format Strings. Formats pulled from CultureInfo file and
+		// may vary by culture. 
+		if (!ignoreStandards && format && format.length === 1) {
+			output = parseStandardFormats.call(this, format);
+			if (output) {
+				return output;
+			}
+		}
+		var parseFormatStrings = parseFormatStringsClosure(this);
+		return format ? format.replace(/((\\)?(dd?d?d?|MM?M?M?|yy?y?y?|hh?|HH?|mm?|ss?|tt?|S|q|Q|WW?W?W?)(?![^\[]*\]))/g, parseFormatStrings).replace(/\[|\]/g, "") : this._toString();
+	};
+
+}());
+},{}],4:[function(require,module,exports){
+(function () {
+	var $D = Date,
+		$P = $D.prototype,
+		p = function (s, l) {
+			if (!l) {
+				l = 2;
+			}
+			return ("000" + s).slice(l * -1);
+		};
+	
+	if (typeof window !== "undefined" && typeof window.console !== "undefined" && typeof window.console.log !== "undefined") {
+		$D.console = console; // used only to raise non-critical errors if available
+	} else {
+		// set mock so we don't give errors.
+		$D.console = {
+			log: function(){},
+			error: function(){}
+		};
+	}
+	$D.Config = $D.Config || {};
+
+	$D.initOverloads = function() {
+		/** 
+		 * Overload of Date.now. Allows an alternate call for Date.now where it returns the 
+		 * current Date as an object rather than just milliseconds since the Unix Epoch.
+		 *
+		 * Also provides an implementation of now() for browsers (IE<9) that don't have it.
+		 * 
+		 * Backwards compatible so with work with either:
+		 *  Date.now() [returns ms]
+		 * or
+		 *  Date.now(true) [returns Date]
+		 */
+		if (!$D.now) {
+			$D._now = function now() {
+				return new Date().getTime();
+			};
+		} else if (!$D._now) {
+			$D._now = $D.now;
+		}
+
+		$D.now = function (returnObj) {
+			if (returnObj) {
+				return $D.present();
+			} else {
+				return $D._now();
+			}
+		};
+
+		if ( !$P.toISOString ) {
+			$P.toISOString = function() {
+				return this.getUTCFullYear() +
+				"-" + p(this.getUTCMonth() + 1) +
+				"-" + p(this.getUTCDate()) +
+				"T" + p(this.getUTCHours()) +
+				":" + p(this.getUTCMinutes()) +
+				":" + p(this.getUTCSeconds()) +
+				"." + String( (this.getUTCMilliseconds()/1000).toFixed(3)).slice(2, 5) +
+				"Z";
+			};
+		}
+		
+		// private
+		if ( $P._toString === undefined ){
+			$P._toString = $P.toString;
+		}
+
+	};
+	$D.initOverloads();
+
+
+	/** 
+	 * Gets a date that is set to the current date. The time is set to the start of the day (00:00 or 12:00 AM).
+	 * @return {Date}    The current date.
+	 */
+	$D.today = function () {
+		return new Date().clearTime();
+	};
+
+	/** 
+	 * Gets a date that is set to the current date and time (same as new Date, but chainable)
+	 * @return {Date}    The current date.
+	 */
+	$D.present = function () {
+		return new Date();
+	};
+
+	/**
+	 * Compares the first date to the second date and returns an number indication of their relative values.  
+	 * @param {Date}     First Date object to compare [Required].
+	 * @param {Date}     Second Date object to compare to [Required].
+	 * @return {Number}  -1 = date1 is lessthan date2. 0 = values are equal. 1 = date1 is greaterthan date2.
+	 */
+	$D.compare = function (date1, date2) {
+		if (isNaN(date1) || isNaN(date2)) {
+			throw new Error(date1 + " - " + date2);
+		} else if (date1 instanceof Date && date2 instanceof Date) {
+			return (date1 < date2) ? -1 : (date1 > date2) ? 1 : 0;
+		} else {
+			throw new TypeError(date1 + " - " + date2);
+		}
+	};
+	
+	/**
+	 * Compares the first Date object to the second Date object and returns true if they are equal.  
+	 * @param {Date}     First Date object to compare [Required]
+	 * @param {Date}     Second Date object to compare to [Required]
+	 * @return {Boolean} true if dates are equal. false if they are not equal.
+	 */
+	$D.equals = function (date1, date2) {
+		return (date1.compareTo(date2) === 0);
+	};
+
+	/**
+	 * Gets the language appropriate day name when given the day number(0-6)
+	 * eg - 0 == Sunday
+	 * @return {String}  The day name
+	 */
+	$D.getDayName = function (n) {
+		return Date.CultureInfo.dayNames[n];
+	};
+
+	/**
+	 * Gets the day number (0-6) if given a CultureInfo specific string which is a valid dayName, abbreviatedDayName or shortestDayName (two char).
+	 * @param {String}   The name of the day (eg. "Monday, "Mon", "tuesday", "tue", "We", "we").
+	 * @return {Number}  The day number
+	 */
+	$D.getDayNumberFromName = function (name) {
+		var n = Date.CultureInfo.dayNames, m = Date.CultureInfo.abbreviatedDayNames, o = Date.CultureInfo.shortestDayNames, s = name.toLowerCase();
+		for (var i = 0; i < n.length; i++) {
+			if (n[i].toLowerCase() === s || m[i].toLowerCase() === s || o[i].toLowerCase() === s) {
+				return i;
+			}
+		}
+		return -1;
+	};
+	
+	/**
+	 * Gets the month number (0-11) if given a Culture Info specific string which is a valid monthName or abbreviatedMonthName.
+	 * @param {String}   The name of the month (eg. "February, "Feb", "october", "oct").
+	 * @return {Number}  The day number
+	 */
+	$D.getMonthNumberFromName = function (name) {
+		var n = Date.CultureInfo.monthNames, m = Date.CultureInfo.abbreviatedMonthNames, s = name.toLowerCase();
+		for (var i = 0; i < n.length; i++) {
+			if (n[i].toLowerCase() === s || m[i].toLowerCase() === s) {
+				return i;
+			}
+		}
+		return -1;
+	};
+
+	/**
+	 * Gets the language appropriate month name when given the month number(0-11)
+	 * eg - 0 == January
+	 * @return {String}  The month name
+	 */
+	$D.getMonthName = function (n) {
+		return Date.CultureInfo.monthNames[n];
+	};
+
+	/**
+	 * Determines if the current date instance is within a LeapYear.
+	 * @param {Number}   The year.
+	 * @return {Boolean} true if date is within a LeapYear, otherwise false.
+	 */
+	$D.isLeapYear = function (year) {
+		return ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0);
+	};
+
+	/**
+	 * Gets the number of days in the month, given a year and month value. Automatically corrects for LeapYear.
+	 * @param {Number}   The year.
+	 * @param {Number}   The month (0-11).
+	 * @return {Number}  The number of days in the month.
+	 */
+	$D.getDaysInMonth = function (year, month) {
+		if (!month && $D.validateMonth(year)) {
+				month = year;
+				year = Date.today().getFullYear();
+		}
+		return [31, ($D.isLeapYear(year) ? 29 : 28), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month];
+	};
+
+	$P.getDaysInMonth = function () {
+		return $D.getDaysInMonth(this.getFullYear(), this.getMonth());
+	};
+ 
+	$D.getTimezoneAbbreviation = function (offset, dst) {
+		var p, n = (dst || false) ? Date.CultureInfo.abbreviatedTimeZoneDST : Date.CultureInfo.abbreviatedTimeZoneStandard;
+		for (p in n) {
+			if (n.hasOwnProperty(p)) {
+				if (n[p] === offset) {
+					return p;
+				}
+			}
+		}
+		return null;
+	};
+	
+	$D.getTimezoneOffset = function (name, dst) {
+		var i, a =[], z = Date.CultureInfo.timezones;
+		if (!name) { name = (new Date()).getTimezone();}
+		for (i = 0; i < z.length; i++) {
+			if (z[i].name === name.toUpperCase()) {
+				a.push(i);
+			}
+		}
+		if (!z[a[0]]) {
+			return null;
+		}
+		if (a.length === 1 || !dst) {
+			return z[a[0]].offset;
+		} else {
+			for (i=0; i < a.length; i++) {
+				if (z[a[i]].dst) {
+					return z[a[i]].offset;
+				}
+			}
+		}
+	};
+
+	$D.getQuarter = function (d) {
+		d = d || new Date(); // If no date supplied, use today
+		var q = [1,2,3,4];
+		return q[Math.floor(d.getMonth() / 3)]; // ~~~ is a bitwise op. Faster than Math.floor
+	};
+
+	$D.getDaysLeftInQuarter = function (d) {
+		d = d || new Date();
+		var qEnd = new Date(d);
+		qEnd.setMonth(qEnd.getMonth() + 3 - qEnd.getMonth() % 3, 0);
+		return Math.floor((qEnd - d) / 8.64e7);
+	};
+
+	// private
+	var validate = function (n, min, max, name) {
+		name = name ? name : "Object";
+		if (typeof n === "undefined") {
+			return false;
+		} else if (typeof n !== "number") {
+			throw new TypeError(n + " is not a Number.");
+		} else if (n < min || n > max) {
+			// As failing validation is *not* an exceptional circumstance 
+			// lets not throw a RangeError Exception here. 
+			// It's semantically correct but it's not sensible.
+			return false;
+		}
+		return true;
+	};
+
+	/**
+	 * Validates the number is within an acceptable range for milliseconds [0-999].
+	 * @param {Number}   The number to check if within range.
+	 * @return {Boolean} true if within range, otherwise false.
+	 */
+	$D.validateMillisecond = function (value) {
+		return validate(value, 0, 999, "millisecond");
+	};
+
+	/**
+	 * Validates the number is within an acceptable range for seconds [0-59].
+	 * @param {Number}   The number to check if within range.
+	 * @return {Boolean} true if within range, otherwise false.
+	 */
+	$D.validateSecond = function (value) {
+		return validate(value, 0, 59, "second");
+	};
+
+	/**
+	 * Validates the number is within an acceptable range for minutes [0-59].
+	 * @param {Number}   The number to check if within range.
+	 * @return {Boolean} true if within range, otherwise false.
+	 */
+	$D.validateMinute = function (value) {
+		return validate(value, 0, 59, "minute");
+	};
+
+	/**
+	 * Validates the number is within an acceptable range for hours [0-23].
+	 * @param {Number}   The number to check if within range.
+	 * @return {Boolean} true if within range, otherwise false.
+	 */
+	$D.validateHour = function (value) {
+		return validate(value, 0, 23, "hour");
+	};
+
+	/**
+	 * Validates the number is within an acceptable range for the days in a month [0-MaxDaysInMonth].
+	 * @param {Number}   The number to check if within range.
+	 * @return {Boolean} true if within range, otherwise false.
+	 */
+	$D.validateDay = function (value, year, month) {
+		if (year === undefined || year === null || month === undefined || month === null) { return false;}
+		return validate(value, 1, $D.getDaysInMonth(year, month), "day");
+	};
+
+	/**
+	 * Validates the number is within an acceptable range for months [0-11].
+	 * @param {Number}   The number to check if within range.
+	 * @return {Boolean} true if within range, otherwise false.
+	 */
+	$D.validateWeek = function (value) {
+		return validate(value, 0, 53, "week");
+	};
+
+	/**
+	 * Validates the number is within an acceptable range for months [0-11].
+	 * @param {Number}   The number to check if within range.
+	 * @return {Boolean} true if within range, otherwise false.
+	 */
+	$D.validateMonth = function (value) {
+		return validate(value, 0, 11, "month");
+	};
+
+	/**
+	 * Validates the number is within an acceptable range for years.
+	 * @param {Number}   The number to check if within range.
+	 * @return {Boolean} true if within range, otherwise false.
+	 */
+	$D.validateYear = function (value) {
+		/**
+		 * Per ECMAScript spec the range of times supported by Date objects is 
+		 * exactly -100,000,000 days to +100,000,000 days measured relative to 
+		 * midnight at the beginning of 01 January, 1970 UTC. 
+		 * This gives a range of 8,640,000,000,000,000 milliseconds to either 
+		 * side of 01 January, 1970 UTC.
+		 *
+		 * Earliest possible date: Tue, 20 Apr 271,822 B.C. 00:00:00 UTC
+		 * Latest possible date: Sat, 13 Sep 275,760 00:00:00 UTC
+		 */
+		return validate(value, -271822, 275760, "year");
+	};
+	$D.validateTimezone = function(value) {
+		var timezones = {"ACDT":1,"ACST":1,"ACT":1,"ADT":1,"AEDT":1,"AEST":1,"AFT":1,"AKDT":1,"AKST":1,"AMST":1,"AMT":1,"ART":1,"AST":1,"AWDT":1,"AWST":1,"AZOST":1,"AZT":1,"BDT":1,"BIOT":1,"BIT":1,"BOT":1,"BRT":1,"BST":1,"BTT":1,"CAT":1,"CCT":1,"CDT":1,"CEDT":1,"CEST":1,"CET":1,"CHADT":1,"CHAST":1,"CHOT":1,"ChST":1,"CHUT":1,"CIST":1,"CIT":1,"CKT":1,"CLST":1,"CLT":1,"COST":1,"COT":1,"CST":1,"CT":1,"CVT":1,"CWST":1,"CXT":1,"DAVT":1,"DDUT":1,"DFT":1,"EASST":1,"EAST":1,"EAT":1,"ECT":1,"EDT":1,"EEDT":1,"EEST":1,"EET":1,"EGST":1,"EGT":1,"EIT":1,"EST":1,"FET":1,"FJT":1,"FKST":1,"FKT":1,"FNT":1,"GALT":1,"GAMT":1,"GET":1,"GFT":1,"GILT":1,"GIT":1,"GMT":1,"GST":1,"GYT":1,"HADT":1,"HAEC":1,"HAST":1,"HKT":1,"HMT":1,"HOVT":1,"HST":1,"ICT":1,"IDT":1,"IOT":1,"IRDT":1,"IRKT":1,"IRST":1,"IST":1,"JST":1,"KGT":1,"KOST":1,"KRAT":1,"KST":1,"LHST":1,"LINT":1,"MAGT":1,"MART":1,"MAWT":1,"MDT":1,"MET":1,"MEST":1,"MHT":1,"MIST":1,"MIT":1,"MMT":1,"MSK":1,"MST":1,"MUT":1,"MVT":1,"MYT":1,"NCT":1,"NDT":1,"NFT":1,"NPT":1,"NST":1,"NT":1,"NUT":1,"NZDT":1,"NZST":1,"OMST":1,"ORAT":1,"PDT":1,"PET":1,"PETT":1,"PGT":1,"PHOT":1,"PHT":1,"PKT":1,"PMDT":1,"PMST":1,"PONT":1,"PST":1,"PYST":1,"PYT":1,"RET":1,"ROTT":1,"SAKT":1,"SAMT":1,"SAST":1,"SBT":1,"SCT":1,"SGT":1,"SLST":1,"SRT":1,"SST":1,"SYOT":1,"TAHT":1,"THA":1,"TFT":1,"TJT":1,"TKT":1,"TLT":1,"TMT":1,"TOT":1,"TVT":1,"UCT":1,"ULAT":1,"UTC":1,"UYST":1,"UYT":1,"UZT":1,"VET":1,"VLAT":1,"VOLT":1,"VOST":1,"VUT":1,"WAKT":1,"WAST":1,"WAT":1,"WEDT":1,"WEST":1,"WET":1,"WST":1,"YAKT":1,"YEKT":1,"Z":1};
+		return (timezones[value] === 1);
+	};
+	$D.validateTimezoneOffset= function(value) {
+		// timezones go from +14hrs to -12hrs, the +X hours are negative offsets.
+		return (value > -841 && value < 721);
+	};
+
+}());
+
+},{}],5:[function(require,module,exports){
+(function () {
+	var $D = Date,
+		$P = $D.prototype,
+		// $C = $D.CultureInfo, // not used atm
+		p = function (s, l) {
+			if (!l) {
+				l = 2;
+			}
+			return ("000" + s).slice(l * -1);
+		};
+	/**
+	 * Converts a PHP format string to Java/.NET format string.
+	 * A PHP format string can be used with ._format or .format.
+	 * A Java/.NET format string can be used with .toString().
+	 * The .parseExact function will only accept a Java/.NET format string
+	 *
+	 * Example
+	 * var f1 = "%m/%d/%y"
+	 * var f2 = Date.normalizeFormat(f1);	// "MM/dd/yy"
+	 *
+	 * new Date().format(f1);	// "04/13/08"
+	 * new Date()._format(f1);	// "04/13/08"
+	 * new Date().toString(f2);	// "04/13/08"
+	 *
+	 * var date = Date.parseExact("04/13/08", f2); // Sun Apr 13 2008
+	 *
+	 * @param {String}   A PHP format string consisting of one or more format spcifiers.
+	 * @return {String}  The PHP format converted to a Java/.NET format string.
+	 */
+	 var normalizerSubstitutions = {
+		"d" : "dd",
+		"%d": "dd",
+		"D" : "ddd",
+		"%a": "ddd",
+		"j" : "dddd",
+		"l" : "dddd",
+		"%A": "dddd",
+		"S" : "S",
+		"F" : "MMMM",
+		"%B": "MMMM",
+		"m" : "MM",
+		"%m": "MM",
+		"M" : "MMM",
+		"%b": "MMM",
+		"%h": "MMM",
+		"n" : "M",
+		"Y" : "yyyy",
+		"%Y": "yyyy",
+		"y" : "yy",
+		"%y": "yy",
+		"g" : "h",
+		"%I": "h",
+		"G" : "H",
+		"h" : "hh",
+		"H" : "HH",
+		"%H": "HH",
+		"i" : "mm",
+		"%M": "mm",
+		"s" : "ss",
+		"%S": "ss",
+		"%r": "hh:mm tt",
+		"%R": "H:mm",
+		"%T": "H:mm:ss",
+		"%X": "t",
+		"%x": "d",
+		"%e": "d",
+		"%D": "MM/dd/yy",
+		"%n": "\\n",
+		"%t": "\\t",
+		"e" : "z",
+		"T" : "z",
+		"%z": "z",
+		"%Z": "z",
+		"Z" : "ZZ",
+		"N" : "u",
+		"w" : "u",
+		"%w": "u",
+		"W" : "W",
+		"%V": "W"
+	};
+	var normalizer = {
+		substitutes: function (m) {
+			return normalizerSubstitutions[m];
+		},
+		interpreted: function (m, x) {
+			var y;
+			switch (m) {
+				case "%u":
+					return x.getDay() + 1;
+				case "z":
+					return x.getOrdinalNumber();
+				case "%j":
+					return p(x.getOrdinalNumber(), 3);
+				case "%U":
+					var d1 = x.clone().set({month: 0, day: 1}).addDays(-1).moveToDayOfWeek(0),
+						d2 = x.clone().addDays(1).moveToDayOfWeek(0, -1);
+					return (d2 < d1) ? "00" : p((d2.getOrdinalNumber() - d1.getOrdinalNumber()) / 7 + 1);
+
+				case "%W":
+					return p(x.getWeek());
+				case "t":
+					return $D.getDaysInMonth(x.getFullYear(), x.getMonth());
+				case "o":
+				case "%G":
+					return x.setWeek(x.getISOWeek()).toString("yyyy");
+				case "%g":
+					return x._format("%G").slice(-2);
+				case "a":
+				case "%p":
+					return t("tt").toLowerCase();
+				case "A":
+					return t("tt").toUpperCase();
+				case "u":
+					return p(x.getMilliseconds(), 3);
+				case "I":
+					return (x.isDaylightSavingTime()) ? 1 : 0;
+				case "O":
+					return x.getUTCOffset();
+				case "P":
+					y = x.getUTCOffset();
+					return y.substring(0, y.length - 2) + ":" + y.substring(y.length - 2);
+				case "B":
+					var now = new Date();
+					return Math.floor(((now.getHours() * 3600) + (now.getMinutes() * 60) + now.getSeconds() + (now.getTimezoneOffset() + 60) * 60) / 86.4);
+				case "c":
+					return x.toISOString().replace(/\"/g, "");
+				case "U":
+					return $D.strtotime("now");
+				case "%c":
+					return t("d") + " " + t("t");
+				case "%C":
+					return Math.floor(x.getFullYear() / 100 + 1);
+			}
+		},
+		shouldOverrideDefaults: function (m) {
+			switch (m) {
+				case "%e":
+					return true;
+				default:
+					return false;
+			}
+		},
+		parse: function (m, context) {
+			var formatString, c = context || new Date();
+			formatString = normalizer.substitutes(m);
+			if (formatString) {
+				return formatString;
+			}
+			formatString = normalizer.interpreted(m, c);
+
+			if (formatString) {
+				return formatString;
+			} else {
+				return m;
+			}
+		}
+	};
+
+	$D.normalizeFormat = function (format, context) {
+		return format.replace(/(%|\\)?.|%%/g, function(t){
+				return normalizer.parse(t, context);
+		});
+	};
+	/**
+	 * Format a local Unix timestamp according to locale settings
+	 *
+	 * Example:
+	 * Date.strftime("%m/%d/%y", new Date());		// "04/13/08"
+	 * Date.strftime("c", "2008-04-13T17:52:03Z");	// "04/13/08"
+	 *
+	 * @param {String}   A format string consisting of one or more format spcifiers [Optional].
+	 * @param {Number|String}   The number representing the number of seconds that have elapsed since January 1, 1970 (local time).
+	 * @return {String}  A string representation of the current Date object.
+	 */
+	$D.strftime = function (format, time) {
+		var d = Date.parse(time);
+		return d._format(format);
+	};
+	/**
+	 * Parse any textual datetime description into a Unix timestamp.
+	 * A Unix timestamp is the number of seconds that have elapsed since January 1, 1970 (midnight UTC/GMT).
+	 *
+	 * Example:
+	 * Date.strtotime("04/13/08");				// 1208044800
+	 * Date.strtotime("1970-01-01T00:00:00Z");	// 0
+	 *
+	 * @param {String}   A format string consisting of one or more format spcifiers [Optional].
+	 * @param {Object}   A string or date object.
+	 * @return {String}  A string representation of the current Date object.
+	 */
+	$D.strtotime = function (time) {
+		var d = $D.parse(time);
+		return Math.round($D.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds(), d.getUTCMilliseconds()) / 1000);
+	};
+	/**
+	 * Converts the value of the current Date object to its equivalent string representation using a PHP/Unix style of date format specifiers.
+	 * Format Specifiers
+	 * Format  Description																	Example
+	 * ------  ---------------------------------------------------------------------------	-----------------------
+	 * %a		abbreviated weekday name according to the current localed					"Mon" through "Sun"
+	 * %A		full weekday name according to the current localed							"Sunday" through "Saturday"
+	 * %b		abbreviated month name according to the current localed						"Jan" through "Dec"
+	 * %B		full month name according to the current locale								"January" through "December"
+	 * %c		preferred date and time representation for the current locale				"4/13/2008 12:33 PM"
+	 * %C		century number (the year divided by 100 and truncated to an integer)		"00" to "99"
+	 * %d		day of the month as a decimal number										"01" to "31"
+	 * %D		same as %m/%d/%y															"04/13/08"
+	 * %e		day of the month as a decimal number, a single digit is preceded by a space	"1" to "31"
+	 * %g		like %G, but without the century											"08"
+	 * %G		The 4-digit year corresponding to the ISO week number (see %V).				"2008"
+	 *		This has the same format and value as %Y, except that if the ISO week number
+	 *		belongs to the previous or next year, that year is used instead.
+	 * %h		same as %b																	"Jan" through "Dec"
+	 * %H		hour as a decimal number using a 24-hour clock.								"00" to "23"
+	 * %I		hour as a decimal number using a 12-hour clock.								"01" to "12"
+	 * %j		day of the year as a decimal number.										"001" to "366"
+	 * %m		month as a decimal number.													"01" to "12"
+	 * %M		minute as a decimal number.													"00" to "59"
+	 * %n		newline character		"\n"
+	 * %p		either "am" or "pm" according to the given time value, or the				"am" or "pm"
+	 *		corresponding strings for the current locale.
+	 * %r		time in a.m. and p.m. notation												"8:44 PM"
+	 * %R		time in 24 hour notation													"20:44"
+	 * %S		second as a decimal number													"00" to "59"
+	 * %t		tab character																"\t"
+	 * %T		current time, equal to %H:%M:%S												"12:49:11"
+	 * %u		weekday as a decimal number ["1", "7"], with "1" representing Monday		"1" to "7"
+	 * %U		week number of the current year as a decimal number, starting with the		"0" to ("52" or "53")
+	 *		first Sunday as the first day of the first week
+	 * %V		The ISO 8601:1988 week number of the current year as a decimal number,		"00" to ("52" or "53")
+	 *		range 01 to 53, where week 1 is the first week that has at least 4 days
+	 *		in the current year, and with Monday as the first day of the week.
+	 *		(Use %G or %g for the year component that corresponds to the week number
+	 *		for the specified timestamp.)
+	 * %W		week number of the current year as a decimal number, starting with the		"00" to ("52" or "53")
+	 *		first Monday as the first day of the first week
+	 * %w		day of the week as a decimal, Sunday being "0"								"0" to "6"
+	 * %x		preferred date representation for the current locale without the time		"4/13/2008"
+	 * %X		preferred time representation for the current locale without the date		"12:53:05"
+	 * %y		year as a decimal number without a century									"00" "99"
+	 * %Y		year as a decimal number including the century								"2008"
+	 * %Z		time zone or name or abbreviation											"UTC", "EST", "PST"
+	 * %z		same as %Z
+	 * %%		a literal "%" characters													"%"
+	 * d		Day of the month, 2 digits with leading zeros								"01" to "31"
+	 * D		A textual representation of a day, three letters							"Mon" through "Sun"
+	 * j		Day of the month without leading zeros										"1" to "31"
+	 * l		A full textual representation of the day of the week (lowercase "L")		"Sunday" through "Saturday"
+	 * N		ISO-8601 numeric representation of the day of the week (added in PHP 5.1.0)	"1" (for Monday) through "7" (for Sunday)
+	 * S		English ordinal suffix for the day of the month, 2 characters				"st", "nd", "rd" or "th". Works well with j
+	 * w		Numeric representation of the day of the week								"0" (for Sunday) through "6" (for Saturday)
+	 * z		The day of the year (starting from "0")										"0" through "365"
+	 * W		ISO-8601 week number of year, weeks starting on Monday						"00" to ("52" or "53")
+	 * F		A full textual representation of a month, such as January or March			"January" through "December"
+	 * m		Numeric representation of a month, with leading zeros						"01" through "12"
+	 * M		A short textual representation of a month, three letters					"Jan" through "Dec"
+	 * n		Numeric representation of a month, without leading zeros					"1" through "12"
+	 * t		Number of days in the given month											"28" through "31"
+	 * L		Whether it's a leap year													"1" if it is a leap year, "0" otherwise
+	 * o		ISO-8601 year number. This has the same value as Y, except that if the		"2008"
+	 *		ISO week number (W) belongs to the previous or next year, that year
+	 *		is used instead.
+	 * Y		A full numeric representation of a year, 4 digits							"2008"
+	 * y		A two digit representation of a year										"08"
+	 * a		Lowercase Ante meridiem and Post meridiem									"am" or "pm"
+	 * A		Uppercase Ante meridiem and Post meridiem									"AM" or "PM"
+	 * B		Swatch Internet time														"000" through "999"
+	 * g		12-hour format of an hour without leading zeros								"1" through "12"
+	 * G		24-hour format of an hour without leading zeros								"0" through "23"
+	 * h		12-hour format of an hour with leading zeros								"01" through "12"
+	 * H		24-hour format of an hour with leading zeros								"00" through "23"
+	 * i		Minutes with leading zeros													"00" to "59"
+	 * s		Seconds, with leading zeros													"00" through "59"
+	 * u		Milliseconds																"54321"
+	 * e		Timezone identifier															"UTC", "EST", "PST"
+	 * I		Whether or not the date is in daylight saving time (uppercase i)			"1" if Daylight Saving Time, "0" otherwise
+	 * O		Difference to Greenwich time (GMT) in hours									"+0200", "-0600"
+	 * P		Difference to Greenwich time (GMT) with colon between hours and minutes		"+02:00", "-06:00"
+	 * T		Timezone abbreviation														"UTC", "EST", "PST"
+	 * Z		Timezone offset in seconds. The offset for timezones west of UTC is			"-43200" through "50400"
+	 *			always negative, and for those east of UTC is always positive.
+	 * c		ISO 8601 date																"2004-02-12T15:19:21+00:00"
+	 * r		RFC 2822 formatted date														"Thu, 21 Dec 2000 16:01:07 +0200"
+	 * U		Seconds since the Unix Epoch (January 1 1970 00:00:00 GMT)					"0"
+	 * @param {String}   A format string consisting of one or more format spcifiers [Optional].
+	 * @return {String}  A string representation of the current Date object.
+	 */
+	var formatReplace = function (context) {
+		return function (m) {
+			var formatString, override = false;
+			if (m.charAt(0) === "\\" || m.substring(0, 2) === "%%") {
+				return m.replace("\\", "").replace("%%", "%");
+			}
+
+			override = normalizer.shouldOverrideDefaults(m);
+			formatString = $D.normalizeFormat(m, context);
+			if (formatString) {
+				return context.toString(formatString, override);
+			}
+		};
+	};
+	$P._format = function (format) {
+		var formatter = formatReplace(this);
+		if (!format) {
+			return this._toString();
+		} else {
+			return format.replace(/(%|\\)?.|%%/g, formatter);
+		}
+	};
+
+	if (!$P.format) {
+		$P.format = $P._format;
+	}
+}());
+},{}],6:[function(require,module,exports){
+(function () {
+	"use strict";
+	Date.Parsing = {
+		Exception: function (s) {
+			this.message = "Parse error at '" + s.substring(0, 10) + " ...'";
+		}
+	};
+	var $P = Date.Parsing;
+	var dayOffsets = {
+		standard: [0,31,59,90,120,151,181,212,243,273,304,334],
+		leap: [0,31,60,91,121,152,182,213,244,274,305,335]
+	};
+
+	$P.isLeapYear = function(year) {
+		return ((year % 4 === 0) && (year % 100 !== 0)) || (year % 400 === 0);
+	};
+
+	var utils = {
+		multiReplace : function (str, hash ) {
+			var key;
+			for (key in hash) {
+				if (Object.prototype.hasOwnProperty.call(hash, key)) {
+					var regex;
+					if (typeof hash[key] === "function") {
+
+					} else {
+						regex = (hash[key] instanceof RegExp) ? hash[key] : new RegExp(hash[key], "g");
+					}
+					str = str.replace(regex, key);
+				}
+			}
+			return str;
+		},
+		getDayOfYearFromWeek : function (obj) {
+			var d, jan4, offset;
+			obj.weekDay = (!obj.weekDay && obj.weekDay !== 0) ? 1 : obj.weekDay;
+			d = new Date(obj.year, 0, 4);
+			jan4 = d.getDay() === 0 ? 7 : d.getDay(); // JS is 0 indexed on Sunday.
+			offset = jan4+3;
+			obj.dayOfYear = ((obj.week * 7) + (obj.weekDay === 0 ? 7 : obj.weekDay))-offset;
+			return obj;
+		},
+		getDayOfYear : function (obj, dayOffset) {
+			if (!obj.dayOfYear) {
+				obj = utils.getDayOfYearFromWeek(obj);
+			}
+			for (var i=0;i <= dayOffset.length;i++) {
+				if (obj.dayOfYear < dayOffset[i] || i === dayOffset.length) {
+					obj.day = obj.day ? obj.day : (obj.dayOfYear - dayOffset[i-1]);
+					break;
+				} else {
+					obj.month = i;
+				}
+			}
+			return obj;
+		},
+		adjustForTimeZone : function (obj, date) {
+			var offset;
+			if (obj.zone.toUpperCase() === "Z" || (obj.zone_hours === 0 && obj.zone_minutes === 0)) {
+				// it's UTC/GML so work out the current timeszone offset
+				offset = -date.getTimezoneOffset();
+			} else {
+				offset = (obj.zone_hours*60) + (obj.zone_minutes || 0);
+				if (obj.zone_sign === "+") {
+					offset *= -1;
+				}
+				offset -= date.getTimezoneOffset();
+			}
+			date.setMinutes(date.getMinutes()+offset);
+			return date;
+		},
+		setDefaults : function (obj) {
+			obj.year = obj.year || Date.today().getFullYear();
+			obj.hours = obj.hours || 0;
+			obj.minutes = obj.minutes || 0;
+			obj.seconds = obj.seconds || 0;
+			obj.milliseconds = obj.milliseconds || 0;
+			if (!(!obj.month && (obj.week || obj.dayOfYear))) {
+				// if we have a month, or if we don't but don't have the day calculation data
+				obj.month = obj.month || 0;
+				obj.day = obj.day || 1;
+			}
+			return obj;
+		},
+		dataNum: function (data, mod, explict, postProcess) {
+			var dataNum = data*1;
+			if (mod) {
+				if (postProcess) {
+					return data ? mod(data)*1 : data;
+				} else {
+					return data ? mod(dataNum) : data;
+				}
+			} else if (!explict){
+				return data ? dataNum : data;
+			} else {
+				return (data && typeof data !== "undefined") ? dataNum : data;
+			}
+		},
+		timeDataProcess: function (obj) {
+			var timeObj = {};
+			for (var x in obj.data) {
+				if (obj.data.hasOwnProperty(x)) {
+					timeObj[x] = obj.ignore[x] ? obj.data[x] : utils.dataNum(obj.data[x], obj.mods[x], obj.explict[x], obj.postProcess[x]);
+				}
+			}
+			if (obj.data.secmins) {
+				obj.data.secmins = obj.data.secmins.replace(",", ".") * 60;
+				if (!timeObj.minutes) {
+					timeObj.minutes = obj.data.secmins;
+				} else if (!timeObj.seconds) {
+					timeObj.seconds = obj.data.secmins;
+				}
+				delete obj.secmins;
+			}
+			return timeObj;
+		},
+		buildTimeObjectFromData: function (data) {
+			var time = utils.timeDataProcess({
+				data: {
+					year : data[1],
+					month : data[5],
+					day : data[7],
+					week : data[8],
+					dayOfYear : data[10],
+					hours : data[15],
+					zone_hours : data[23],
+					zone_minutes : data[24],
+					zone : data[21],
+					zone_sign : data[22],
+					weekDay : data[9],
+					minutes: data[16],
+					seconds: data[19],
+					milliseconds: data[20],
+					secmins: data[18]
+				},
+				mods: {
+					month: function(data) {
+						return data-1;
+					},
+					weekDay: function (data) {
+						data = Math.abs(data);
+						return (data === 7 ? 0 : data);
+					},
+					minutes: function (data) {
+						return data.replace(":","");
+					},
+					seconds: function (data) {
+						return Math.floor( (data.replace(":","").replace(",","."))*1 );
+					},
+					milliseconds: function (data) {
+						return (data.replace(",",".")*1000);
+					}
+				},
+				postProcess: {
+					minutes: true,
+					seconds: true,
+					milliseconds: true
+				},
+				explict: {
+					zone_hours: true,
+					zone_minutes: true
+				},
+				ignore: {
+					zone: true,
+					zone_sign: true,
+					secmins: true
+				}
+			});
+			return time;
+		},
+		addToHash: function (hash, keys, data) {
+			keys = keys;
+			data = data;
+			var len = keys.length;
+			for (var i = 0; i < len; i++) {
+			  hash[keys[i]] = data[i];
+			}
+			return hash;
+		},
+		combineRegex: function (r1, r2) {
+			return new RegExp("(("+r1.source+")\\s("+r2.source+"))");
+		},
+		getDateNthString: function(add, last, inc){
+			if (add) {
+				return Date.today().addDays(inc).toString("d");
+			} else if (last) {
+				return Date.today().last()[inc]().toString("d");
+			}
+
+		},
+		buildRegexData: function (array) {
+			var arr = [];
+			var len = array.length;
+			for (var i=0; i < len; i++) {
+				if (Object.prototype.toString.call(array[i]) === '[object Array]') { // oldIE compat version of Array.isArray
+					arr.push(this.combineRegex(array[i][0], array[i][1]));
+				} else {
+					arr.push(array[i]);
+				}
+			}
+			return arr;
+		}
+	};
+
+	$P.processTimeObject = function (obj) {
+		var date, dayOffset;
+
+		utils.setDefaults(obj);
+		dayOffset = ($P.isLeapYear(obj.year)) ? dayOffsets.leap : dayOffsets.standard;
+
+		if (!obj.month && (obj.week || obj.dayOfYear)) {
+			utils.getDayOfYear(obj, dayOffset);
+		} else {
+			obj.dayOfYear = dayOffset[obj.month] + obj.day;
+		}
+
+		date = new Date(obj.year, obj.month, obj.day, obj.hours, obj.minutes, obj.seconds, obj.milliseconds);
+
+		if (obj.zone) {
+			utils.adjustForTimeZone(obj, date); // adjust (and calculate) for timezone
+		}
+		return date;
+	};
+
+	$P.ISO = {
+		regex : /^([\+-]?\d{4}(?!\d{2}\b))((-?)((0[1-9]|1[0-2])(\3([12]\d|0[1-9]|3[01]))?|W([0-4]\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\d|[12]\d{2}|3([0-5]\d|6[1-6])))([T\s]((([01]\d|2[0-4])((:?)[0-5]\d)?|24\:?00)([\.,]\d+(?!:))?)?(\17[0-5]\d([\.,]\d+)?)?\s?([zZ]|([\+-])([01]\d|2[0-3]):?([0-5]\d)?)?)?)?$/,
+		parse : function (s) {
+			var time, data = s.match(this.regex);
+			if (!data || !data.length) {
+				return null;
+			}
+
+			time = utils.buildTimeObjectFromData(data);
+
+			if (!time.year || (!time.year && (!time.month && !time.day) && (!time.week && !time.dayOfYear)) ) {
+				return null;
+			}
+			return $P.processTimeObject(time);
+		}
+	};
+
+	$P.Numeric = {
+		isNumeric: function (e){return!isNaN(parseFloat(e))&&isFinite(e);},
+		regex: /\b([0-1]?[0-9])([0-3]?[0-9])([0-2]?[0-9]?[0-9][0-9])\b/i,
+		parse: function (s) {
+			var data, i,
+				time = {},
+				order = Date.CultureInfo.dateElementOrder.split("");
+			if (!(this.isNumeric(s)) || // if it's non-numeric OR
+				(s[0] === "+" && s[0] === "-")) {			// It's an arithmatic string (eg +/-1000)
+				return null;
+			}
+			if (s.length < 5 && s.indexOf(".") < 0 && s.indexOf("/") < 0) { // assume it's just a year.
+				time.year = s;
+				return $P.processTimeObject(time);
+			}
+			data = s.match(this.regex);
+			if (!data || !data.length) {
+				return null;
+			}
+			for (i=0; i < order.length; i++) {
+				switch(order[i]) {
+					case "d":
+						time.day = data[i+1];
+						break;
+					case "m":
+						time.month = (data[i+1]-1);
+						break;
+					case "y":
+						time.year = data[i+1];
+						break;
+				}
+			}
+			return $P.processTimeObject(time);
+		}
+	};
+
+	$P.Normalizer = {
+		regexData: function () {
+			var $R = Date.CultureInfo.regexPatterns;
+			return utils.buildRegexData([
+				$R.tomorrow,
+				$R.yesterday,
+				[$R.past, $R.mon],
+				[$R.past, $R.tue],
+				[$R.past, $R.wed],
+				[$R.past, $R.thu],
+				[$R.past, $R.fri],
+				[$R.past, $R.sat],
+				[$R.past, $R.sun]
+			]);
+		},
+		basicReplaceHash : function() {
+			var $R = Date.CultureInfo.regexPatterns;
+			return {
+				"January": $R.jan.source,
+				"February": $R.feb,
+				"March": $R.mar,
+				"April": $R.apr,
+				"May": $R.may,
+				"June": $R.jun,
+				"July": $R.jul,
+				"August": $R.aug,
+				"September": $R.sep,
+				"October": $R.oct,
+				"November": $R.nov,
+				"December": $R.dec,
+				"": /\bat\b/gi,
+				" ": /\s{2,}/,
+				"am": $R.inTheMorning,
+				"9am": $R.thisMorning,
+				"pm": $R.inTheEvening,
+				"7pm":$R.thisEvening
+			};
+		},
+		keys : function(){
+			return [
+				utils.getDateNthString(true, false, 1),				// tomorrow
+				utils.getDateNthString(true, false, -1),			// yesterday
+				utils.getDateNthString(false, true, "monday"),		//last mon
+				utils.getDateNthString(false, true, "tuesday"),		//last tues
+				utils.getDateNthString(false, true, "wednesday"),	//last wed
+				utils.getDateNthString(false, true, "thursday"),	//last thurs
+				utils.getDateNthString(false, true, "friday"),		//last fri
+				utils.getDateNthString(false, true, "saturday"),	//last sat
+				utils.getDateNthString(false, true, "sunday")		//last sun
+			];
+		},
+		buildRegexFunctions: function () {
+			var $R = Date.CultureInfo.regexPatterns;
+			var __ = Date.i18n.__;
+			var tomorrowRE = new RegExp("(\\b\\d\\d?("+__("AM")+"|"+__("PM")+")? )("+$R.tomorrow.source.slice(1)+")", "i"); // adapted tomorrow regex for AM PM relative dates
+			var todayRE = new RegExp($R.today.source + "(?!\\s*([+-]))\\b"); // today, but excludes the math operators (eg "today + 2h")
+
+			this.replaceFuncs = [
+				[todayRE, function (full) {
+					return (full.length > 1) ? Date.today().toString("d") : full;
+				}],
+				[tomorrowRE,
+				function(full, m1) {
+					var t = Date.today().addDays(1).toString("d");
+					return (t + " " + m1);
+				}],
+				[$R.amThisMorning, function(str, am){return am;}],
+				[$R.pmThisEvening, function(str, pm){return pm;}]
+			];
+
+		},
+		buildReplaceData: function () {
+			this.buildRegexFunctions();
+			this.replaceHash = utils.addToHash(this.basicReplaceHash(), this.keys(), this.regexData());
+		},
+		stringReplaceFuncs: function (s) {
+			for (var i=0; i < this.replaceFuncs.length; i++) {
+				s = s.replace(this.replaceFuncs[i][0], this.replaceFuncs[i][1]);
+			}
+			return s;
+		},
+		parse: function (s) {
+			s = this.stringReplaceFuncs(s);
+			s = utils.multiReplace(s, this.replaceHash);
+
+			try {
+				var n = s.split(/([\s\-\.\,\/\x27]+)/);
+				if (n.length === 3 &&
+					$P.Numeric.isNumeric(n[0]) &&
+					$P.Numeric.isNumeric(n[2]) &&
+					(n[2].length >= 4)) {
+						// ok, so we're dealing with x/year. But that's not a full date.
+						// This fixes wonky dateElementOrder parsing when set to dmy order.
+						if (Date.CultureInfo.dateElementOrder[0] === "d") {
+							s = "1/" + n[0] + "/" + n[2]; // set to 1st of month and normalize the seperator
+						}
+				}
+			} catch (e) {}
+
+			return s;
+		}
+	};
+	$P.Normalizer.buildReplaceData();
+}());
+},{}],7:[function(require,module,exports){
+(function () {
+	var $D = Date;
+	var lang = Date.CultureStrings ? Date.CultureStrings.lang : null;
+	var loggedKeys = {}; // for debug purposes.
+	var getText = {
+		getFromKey: function (key, countryCode) {
+			var output;
+			if (Date.CultureStrings && Date.CultureStrings[countryCode] && Date.CultureStrings[countryCode][key]) {
+				output = Date.CultureStrings[countryCode][key];
+			} else {
+				output = getText.buildFromDefault(key);
+			}
+			if (key.charAt(0) === "/") { // Assume it's a regex
+				output = getText.buildFromRegex(key, countryCode);
+			}
+			return output;
+		},
+		getFromObjectValues: function (obj, countryCode) {
+			var key, output = {};
+			for(key in obj) {
+				if (obj.hasOwnProperty(key)) {
+					output[key] = getText.getFromKey(obj[key], countryCode);
+				}
+			}
+			return output;
+		},
+		getFromObjectKeys: function (obj, countryCode) {
+			var key, output = {};
+			for(key in obj) {
+				if (obj.hasOwnProperty(key)) {
+					output[getText.getFromKey(key, countryCode)] = obj[key];
+				}
+			}
+			return output;
+		},
+		getFromArray: function (arr, countryCode) {
+			var output = [];
+			for (var i=0; i < arr.length; i++){
+				if (i in arr) {
+					output[i] = getText.getFromKey(arr[i], countryCode);
+				}
+			}
+			return output;
+		},
+		buildFromDefault: function (key) {
+			var output, length, split, last;
+			switch(key) {
+				case "name":
+					output = "en-US";
+					break;
+				case "englishName":
+					output = "English (United States)";
+					break;
+				case "nativeName":
+					output = "English (United States)";
+					break;
+				case "twoDigitYearMax":
+					output = 2049;
+					break;
+				case "firstDayOfWeek":
+					output = 0;
+					break;
+				default:
+					output = key;
+					split = key.split("_");
+					length = split.length;
+					if (length > 1 && key.charAt(0) !== "/") {
+						// if the key isn't a regex and it has a split.
+						last = split[(length - 1)].toLowerCase();
+						if (last === "initial" || last === "abbr") {
+							output = split[0];
+						}
+					}
+					break;
+			}
+			return output;
+		},
+		buildFromRegex: function (key, countryCode) {
+			var output;
+			if (Date.CultureStrings && Date.CultureStrings[countryCode] && Date.CultureStrings[countryCode][key]) {
+				output = new RegExp(Date.CultureStrings[countryCode][key], "i");
+			} else {
+				output = new RegExp(key.replace(new RegExp("/", "g"),""), "i");
+			}
+			return output;
+		}
+	};
+
+	var shallowMerge = function (obj1, obj2) {
+		for (var attrname in obj2) {
+			if (obj2.hasOwnProperty(attrname)) {
+				obj1[attrname] = obj2[attrname];
+			}
+		}
+	};
+
+	var __ = function (key, language) {
+		var countryCode = (language) ? language : lang;
+		loggedKeys[key] = key;
+		if (typeof key === "object") {
+			if (key instanceof Array) {
+				return getText.getFromArray(key, countryCode);
+			} else {
+				return getText.getFromObjectKeys(key, countryCode);
+			}
+		} else {
+			return getText.getFromKey(key, countryCode);
+		}
+	};
+	
+	var loadI18nScript = function (code) {
+		// paatterned after jQuery's getScript.
+		var url = Date.Config.i18n + code + ".js";
+		var head = document.getElementsByTagName("head")[0] || document.documentElement;
+		var script = document.createElement("script");
+		script.src = url;
+
+		var completed = false;
+		var events = {
+			done: function (){} // placeholder function
+		};
+		// Attach handlers for all browsers
+		script.onload = script.onreadystatechange = function() {
+			if ( !completed && (!this.readyState || this.readyState === "loaded" || this.readyState === "complete") ) {
+				events.done();
+				head.removeChild(script);
+			}
+		};
+
+		setTimeout(function() {
+			head.insertBefore(script, head.firstChild);
+		}, 0); // allows return to execute first
+		
+		return {
+			done: function (cb) {
+				events.done = function() {
+					if (cb) {
+						setTimeout(cb,0);
+					}
+				};
+			}
+		};
+	};
+
+	var buildInfo = {
+		buildFromMethodHash: function (obj) {
+			var key;
+			for(key in obj) {
+				if (obj.hasOwnProperty(key)) {
+					obj[key] = buildInfo[obj[key]]();
+				}
+			}
+			return obj;
+		},
+		timeZoneDST: function () {
+			var DST = {
+				"CHADT": "+1345",
+				"NZDT": "+1300",
+				"AEDT": "+1100",
+				"ACDT": "+1030",
+				"AZST": "+0500",
+				"IRDT": "+0430",
+				"EEST": "+0300",
+				"CEST": "+0200",
+				"BST": "+0100",
+				"PMDT": "-0200",
+				"ADT": "-0300",
+				"NDT": "-0230",
+				"EDT": "-0400",
+				"CDT": "-0500",
+				"MDT": "-0600",
+				"PDT": "-0700",
+				"AKDT": "-0800",
+				"HADT": "-0900"
+			};
+			return __(DST);
+		},
+		timeZoneStandard: function () {
+			var standard = {
+				"LINT": "+1400",
+				"TOT": "+1300",
+				"CHAST": "+1245",
+				"NZST": "+1200",
+				"NFT": "+1130",
+				"SBT": "+1100",
+				"AEST": "+1000",
+				"ACST": "+0930",
+				"JST": "+0900",
+				"CWST": "+0845",
+				"CT": "+0800",
+				"ICT": "+0700",
+				"MMT": "+0630",
+				"BST": "+0600",
+				"NPT": "+0545",
+				"IST": "+0530",
+				"PKT": "+0500",
+				"AFT": "+0430",
+				"MSK": "+0400",
+				"IRST": "+0330",
+				"FET": "+0300",
+				"EET": "+0200",
+				"CET": "+0100",
+				"GMT": "+0000",
+				"UTC": "+0000",
+				"CVT": "-0100",
+				"GST": "-0200",
+				"BRT": "-0300",
+				"NST": "-0330",
+				"AST": "-0400",
+				"EST": "-0500",
+				"CST": "-0600",
+				"MST": "-0700",
+				"PST": "-0800",
+				"AKST": "-0900",
+				"MIT": "-0930",
+				"HST": "-1000",
+				"SST": "-1100",
+				"BIT": "-1200"
+			};
+			return __(standard);
+		},
+		timeZones: function (data) {
+			var zone;
+			data.timezones = [];
+			for (zone in data.abbreviatedTimeZoneStandard) {
+				if (data.abbreviatedTimeZoneStandard.hasOwnProperty(zone)) {
+					data.timezones.push({ name: zone, offset: data.abbreviatedTimeZoneStandard[zone]});
+				}
+			}
+			for (zone in data.abbreviatedTimeZoneDST) {
+				if (data.abbreviatedTimeZoneDST.hasOwnProperty(zone)) {
+					data.timezones.push({ name: zone, offset: data.abbreviatedTimeZoneDST[zone], dst: true});
+				}
+			}
+			return data.timezones;
+		},
+		days: function () {
+			return __(["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]);
+		},
+		dayAbbr: function () {
+			return __(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
+		},
+		dayShortNames: function () {
+			return __(["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]);
+		},
+		dayFirstLetters: function () {
+			return __(["S_Sun_Initial", "M_Mon_Initial", "T_Tues_Initial", "W_Wed_Initial", "T_Thu_Initial", "F_Fri_Initial", "S_Sat_Initial"]);
+		},
+		months: function () {
+			return __(["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]);
+		},
+		monthAbbr: function () {
+			return __(["Jan_Abbr", "Feb_Abbr", "Mar_Abbr", "Apr_Abbr", "May_Abbr", "Jun_Abbr", "Jul_Abbr", "Aug_Abbr", "Sep_Abbr", "Oct_Abbr", "Nov_Abbr", "Dec_Abbr"]);
+		},
+		formatPatterns: function () {
+			return getText.getFromObjectValues({
+				shortDate: "M/d/yyyy",
+				longDate: "dddd, MMMM dd, yyyy",
+				shortTime: "h:mm tt",
+				longTime: "h:mm:ss tt",
+				fullDateTime: "dddd, MMMM dd, yyyy h:mm:ss tt",
+				sortableDateTime: "yyyy-MM-ddTHH:mm:ss",
+				universalSortableDateTime: "yyyy-MM-dd HH:mm:ssZ",
+				rfc1123: "ddd, dd MMM yyyy HH:mm:ss",
+				monthDay: "MMMM dd",
+				yearMonth: "MMMM, yyyy"
+			}, Date.i18n.currentLanguage());
+		},
+		regex: function () {
+			return getText.getFromObjectValues({
+				inTheMorning: "/( in the )(morn(ing)?)\\b/",
+				thisMorning: "/(this )(morn(ing)?)\\b/",
+				amThisMorning: "/(\b\\d(am)? )(this )(morn(ing)?)/",
+				inTheEvening: "/( in the )(even(ing)?)\\b/",
+				thisEvening: "/(this )(even(ing)?)\\b/",
+				pmThisEvening: "/(\b\\d(pm)? )(this )(even(ing)?)/",
+				jan: "/jan(uary)?/",
+				feb: "/feb(ruary)?/",
+				mar: "/mar(ch)?/",
+				apr: "/apr(il)?/",
+				may: "/may/",
+				jun: "/jun(e)?/",
+				jul: "/jul(y)?/",
+				aug: "/aug(ust)?/",
+				sep: "/sep(t(ember)?)?/",
+				oct: "/oct(ober)?/",
+				nov: "/nov(ember)?/",
+				dec: "/dec(ember)?/",
+				sun: "/^su(n(day)?)?/",
+				mon: "/^mo(n(day)?)?/",
+				tue: "/^tu(e(s(day)?)?)?/",
+				wed: "/^we(d(nesday)?)?/",
+				thu: "/^th(u(r(s(day)?)?)?)?/",
+				fri: "/fr(i(day)?)?/",
+				sat: "/^sa(t(urday)?)?/",
+				future: "/^next/",
+				past: "/^last|past|prev(ious)?/",
+				add: "/^(\\+|aft(er)?|from|hence)/",
+				subtract: "/^(\\-|bef(ore)?|ago)/",
+				yesterday: "/^yes(terday)?/",
+				today: "/^t(od(ay)?)?/",
+				tomorrow: "/^tom(orrow)?/",
+				now: "/^n(ow)?/",
+				millisecond: "/^ms|milli(second)?s?/",
+				second: "/^sec(ond)?s?/",
+				minute: "/^mn|min(ute)?s?/",
+				hour: "/^h(our)?s?/",
+				week: "/^w(eek)?s?/",
+				month: "/^m(onth)?s?/",
+				day: "/^d(ay)?s?/",
+				year: "/^y(ear)?s?/",
+				shortMeridian: "/^(a|p)/",
+				longMeridian: "/^(a\\.?m?\\.?|p\\.?m?\\.?)/",
+				timezone: "/^((e(s|d)t|c(s|d)t|m(s|d)t|p(s|d)t)|((gmt)?\\s*(\\+|\\-)\\s*\\d\\d\\d\\d?)|gmt|utc)/",
+				ordinalSuffix: "/^\\s*(st|nd|rd|th)/",
+				timeContext: "/^\\s*(\\:|a(?!u|p)|p)/"
+			}, Date.i18n.currentLanguage());
+		}
+	};
+
+	var CultureInfo = function () {
+		var info = getText.getFromObjectValues({
+			name: "name",
+			englishName: "englishName",
+			nativeName: "nativeName",
+			amDesignator: "AM",
+			pmDesignator: "PM",
+			firstDayOfWeek: "firstDayOfWeek",
+			twoDigitYearMax: "twoDigitYearMax",
+			dateElementOrder: "mdy"
+		}, Date.i18n.currentLanguage());
+
+		var constructedInfo = buildInfo.buildFromMethodHash({
+			dayNames: "days",
+			abbreviatedDayNames: "dayAbbr",
+			shortestDayNames: "dayShortNames",
+			firstLetterDayNames: "dayFirstLetters",
+			monthNames: "months",
+			abbreviatedMonthNames: "monthAbbr",
+			formatPatterns: "formatPatterns",
+			regexPatterns: "regex",
+			abbreviatedTimeZoneDST: "timeZoneDST",
+			abbreviatedTimeZoneStandard: "timeZoneStandard"
+		});
+
+		shallowMerge(info, constructedInfo);
+		buildInfo.timeZones(info);
+		return info;
+	};
+
+	$D.i18n = {
+		__: function (key, lang) {
+			return __(key, lang);
+		},
+		currentLanguage: function () {
+			return lang || "en-US";
+		},
+		setLanguage: function (code, force, cb) {
+			var async = false;
+			if (force || code === "en-US" || (!!Date.CultureStrings && !!Date.CultureStrings[code])) {
+				lang = code;
+				Date.CultureStrings = Date.CultureStrings || {};
+				Date.CultureStrings.lang = code;
+				Date.CultureInfo = new CultureInfo();
+			} else {
+				if (!(!!Date.CultureStrings && !!Date.CultureStrings[code])) {
+					if (typeof exports !== "undefined" && this.exports !== exports) {
+						// we're in a Node enviroment, load it using require
+						try {
+							require("../i18n/" + code + ".js");
+							lang = code;
+							Date.CultureStrings.lang = code;
+							Date.CultureInfo = new CultureInfo();
+						} catch (e) {
+							// var str = "The language for '" + code + "' could not be loaded by Node. It likely does not exist.";
+							throw new Error("The DateJS IETF language tag '" + code + "' could not be loaded by Node. It likely does not exist.");
+						}
+					} else if (Date.Config && Date.Config.i18n) {
+						// we know the location of the files, so lets load them					
+						async = true;
+						loadI18nScript(code).done(function(){
+							lang = code;
+							Date.CultureStrings = Date.CultureStrings || {};
+							Date.CultureStrings.lang = code;
+							Date.CultureInfo = new CultureInfo();
+							$D.Parsing.Normalizer.buildReplaceData(); // because this is async
+							if ($D.Grammar) {
+								$D.Grammar.buildGrammarFormats(); // so we can parse those strings...
+							}
+							if (cb) {
+								setTimeout(cb,0);
+							}
+						});
+					} else {
+						Date.console.error("The DateJS IETF language tag '" + code + "' is not available and has not been loaded.");
+						return false;
+					}
+				}
+			}
+			$D.Parsing.Normalizer.buildReplaceData(); // rebuild normalizer strings
+			if ($D.Grammar) {
+				$D.Grammar.buildGrammarFormats(); // so we can parse those strings...
+			}
+			if (!async && cb) {
+				setTimeout(cb,0);
+			}
+		},
+		getLoggedKeys: function () {
+			return loggedKeys;
+		},
+		updateCultureInfo: function () {
+			Date.CultureInfo = new CultureInfo();
+		}
+	};
+	$D.i18n.updateCultureInfo(); // run automatically
+}());
+},{}],8:[function(require,module,exports){
+(function () {
+	var $D = Date;
+
+	/**
+	 * @desc Converts the specified string value into its JavaScript Date equivalent using CultureInfo specific format information.
+	 * 
+	 * Example
+	<pre><code>
+	///////////
+	// Dates //
+	///////////
+
+	// 15-Oct-2004
+	var d1 = Date.parse("10/15/2004");
+
+	// 15-Oct-2004
+	var d1 = Date.parse("15-Oct-2004");
+
+	// 15-Oct-2004
+	var d1 = Date.parse("2004.10.15");
+
+	//Fri Oct 15, 2004
+	var d1 = Date.parse("Fri Oct 15, 2004");
+
+	///////////
+	// Times //
+	///////////
+
+	// Today at 10 PM.
+	var d1 = Date.parse("10 PM");
+
+	// Today at 10:30 PM.
+	var d1 = Date.parse("10:30 P.M.");
+
+	// Today at 6 AM.
+	var d1 = Date.parse("06am");
+
+	/////////////////////
+	// Dates and Times //
+	/////////////////////
+
+	// 8-July-2004 @ 10:30 PM
+	var d1 = Date.parse("July 8th, 2004, 10:30 PM");
+
+	// 1-July-2004 @ 10:30 PM
+	var d1 = Date.parse("2004-07-01T22:30:00");
+
+	////////////////////
+	// Relative Dates //
+	////////////////////
+
+	// Returns today's date. The string "today" is culture specific.
+	var d1 = Date.parse("today");
+
+	// Returns yesterday's date. The string "yesterday" is culture specific.
+	var d1 = Date.parse("yesterday");
+
+	// Returns the date of the next thursday.
+	var d1 = Date.parse("Next thursday");
+
+	// Returns the date of the most previous monday.
+	var d1 = Date.parse("last monday");
+
+	// Returns today's day + one year.
+	var d1 = Date.parse("next year");
+
+	///////////////
+	// Date Math //
+	///////////////
+
+	// Today + 2 days
+	var d1 = Date.parse("t+2");
+
+	// Today + 2 days
+	var d1 = Date.parse("today + 2 days");
+
+	// Today + 3 months
+	var d1 = Date.parse("t+3m");
+
+	// Today - 1 year
+	var d1 = Date.parse("today - 1 year");
+
+	// Today - 1 year
+	var d1 = Date.parse("t-1y"); 
+
+
+	/////////////////////////////
+	// Partial Dates and Times //
+	/////////////////////////////
+
+	// July 15th of this year.
+	var d1 = Date.parse("July 15");
+
+	// 15th day of current day and year.
+	var d1 = Date.parse("15");
+
+	// July 1st of current year at 10pm.
+	var d1 = Date.parse("7/1 10pm");
+	</code></pre>
+	 *
+	 * @param {String}   The string value to convert into a Date object [Required]
+	 * @return {Date}    A Date object or null if the string cannot be converted into a Date.
+	 */
+	var parseUtils = {
+		removeOrds: function (s) {
+			ords = s.match(/\b(\d+)(?:st|nd|rd|th)\b/); // find ordinal matches
+			s = ((ords && ords.length === 2) ? s.replace(ords[0], ords[1]) : s);
+			return s;
+		},
+		grammarParser: function (s) {
+			var r = null;
+			try {
+				r = $D.Grammar.start.call({}, s.replace(/^\s*(\S*(\s+\S+)*)\s*$/, "$1"));
+			} catch (e) {
+				return null;
+			}
+			
+			return ((r[1].length === 0) ? r[0] : null);
+		},
+		nativeFallback: function(s) {
+			var t;
+			try {
+				// ok we haven't parsed it, last ditch attempt with the built-in parser.
+				t = Date._parse(s);
+				return (t || t === 0) ? new Date(t) : null;
+			} catch (e) {
+				return null;
+			}
+		}
+	};
+	function parse (s) {
+		var d;
+		if (!s) {
+			return null;
+		}
+		if (s instanceof Date) {
+			return s.clone();
+		}
+		if (s.length >= 4 && s.charAt(0) !== "0" && s.charAt(0) !== "+"&& s.charAt(0) !== "-") { // ie: 2004 will pass, 0800 won't.
+			//  Start with specific formats
+			d = $D.Parsing.ISO.parse(s) || $D.Parsing.Numeric.parse(s);
+		}
+		if (d instanceof Date && !isNaN(d.getTime())) {
+			return d;
+		} else {
+			// find ordinal dates (1st, 3rd, 8th, etc and remove them as they cause parsing issues)
+			s = $D.Parsing.Normalizer.parse(parseUtils.removeOrds(s));
+			d = parseUtils.grammarParser(s);
+			if (d !== null) {
+				return d;
+			} else {
+				return parseUtils.nativeFallback(s);
+			}
+		}
+	}
+
+	if (!$D._parse) {
+		$D._parse = $D.parse;
+	}
+	$D.parse = parse;
+
+	Date.getParseFunction = function (fx) {
+		var fns = Date.Grammar.allformats(fx);
+		return function (s) {
+			var r = null;
+			for (var i = 0; i < fns.length; i++) {
+				try {
+					r = fns[i].call({}, s);
+				} catch (e) {
+					continue;
+				}
+				if (r[1].length === 0) {
+					return r[0];
+				}
+			}
+			return null;
+		};
+	};
+	
+	/**
+	 * Converts the specified string value into its JavaScript Date equivalent using the specified format {String} or formats {Array} and the CultureInfo specific format information.
+	 * The format of the string value must match one of the supplied formats exactly.
+	 * 
+	 * Example
+	<pre><code>
+	// 15-Oct-2004
+	var d1 = Date.parseExact("10/15/2004", "M/d/yyyy");
+
+	// 15-Oct-2004
+	var d1 = Date.parse("15-Oct-2004", "M-ddd-yyyy");
+
+	// 15-Oct-2004
+	var d1 = Date.parse("2004.10.15", "yyyy.MM.dd");
+
+	// Multiple formats
+	var d1 = Date.parseExact("10/15/2004", ["M/d/yyyy", "MMMM d, yyyy"]);
+	</code></pre>
+	 *
+	 * @param {String}   The string value to convert into a Date object [Required].
+	 * @param {Object}   The expected format {String} or an array of expected formats {Array} of the date string [Required].
+	 * @return {Date}    A Date object or null if the string cannot be converted into a Date.
+	 */
+	$D.parseExact = function (s, fx) {
+		return $D.getParseFunction(fx)(s);
+	};
+}());
+
+},{}],9:[function(require,module,exports){
+(function () {
+	var $D = Date;
+	$D.Grammar = {};
+	var _ = $D.Parsing.Operators, g = $D.Grammar, t = $D.Translator, _fn;
+	// Allow rolling up into general purpose rules
+	_fn = function () {
+		return _.each(_.any.apply(null, arguments), _.not(g.ctoken2("timeContext")));
+	};
+	
+	g.datePartDelimiter = _.rtoken(/^([\s\-\.\,\/\x27]+)/);
+	g.timePartDelimiter = _.stoken(":");
+	g.whiteSpace = _.rtoken(/^\s*/);
+	g.generalDelimiter = _.rtoken(/^(([\s\,]|at|@|on)+)/);
+  
+	var _C = {};
+	g.ctoken = function (keys) {
+		var fn = _C[keys];
+		if (! fn) {
+			var c = Date.CultureInfo.regexPatterns;
+			var kx = keys.split(/\s+/), px = [];
+			for (var i = 0; i < kx.length ; i++) {
+				px.push(_.replace(_.rtoken(c[kx[i]]), kx[i]));
+			}
+			fn = _C[keys] = _.any.apply(null, px);
+		}
+		return fn;
+	};
+	g.ctoken2 = function (key) {
+		return _.rtoken(Date.CultureInfo.regexPatterns[key]);
+	};
+	var cacheProcessRtoken = function (key, token, type, eachToken) {
+		if (eachToken) {
+			g[key] = _.cache(_.process(_.each(_.rtoken(token),_.optional(g.ctoken2(eachToken))), type));
+		} else {
+			g[key] = _.cache(_.process(_.rtoken(token), type));
+		}
+	};
+	var cacheProcessCtoken = function (token, type) {
+		return _.cache(_.process(g.ctoken2(token), type));
+	};
+	var _F = {}; //function cache
+
+	var _get = function (f) {
+		_F[f] = (_F[f] || g.format(f)[0]);
+		return _F[f];
+	};
+
+	g.allformats = function (fx) {
+		var rx = [];
+		if (fx instanceof Array) {
+			for (var i = 0; i < fx.length; i++) {
+				rx.push(_get(fx[i]));
+			}
+		} else {
+			rx.push(_get(fx));
+		}
+		return rx;
+	};
+  
+	g.formats = function (fx) {
+		if (fx instanceof Array) {
+			var rx = [];
+			for (var i = 0 ; i < fx.length ; i++) {
+				rx.push(_get(fx[i]));
+			}
+			return _.any.apply(null, rx);
+		} else {
+			return _get(fx);
+		}
+	};
+
+	var grammarFormats = {
+		 timeFormats: function(){
+			var i,
+			RTokenKeys = [
+				"h",
+				"hh",
+				"H",
+				"HH",
+				"m",
+				"mm",
+				"s",
+				"ss",
+				"ss.s",
+				"z",
+				"zz"
+			],
+			RToken = [
+				/^(0[0-9]|1[0-2]|[1-9])/,
+				/^(0[0-9]|1[0-2])/,
+				/^([0-1][0-9]|2[0-3]|[0-9])/,
+				/^([0-1][0-9]|2[0-3])/,
+				/^([0-5][0-9]|[0-9])/,
+				/^[0-5][0-9]/,
+				/^([0-5][0-9]|[0-9])/,
+				/^[0-5][0-9]/,
+				/^[0-5][0-9]\.[0-9]{1,3}/,
+				/^((\+|\-)\s*\d\d\d\d)|((\+|\-)\d\d\:?\d\d)/,
+				/^((\+|\-)\s*\d\d\d\d)|((\+|\-)\d\d\:?\d\d)/
+			],
+			tokens = [
+				t.hour,
+				t.hour,
+				t.hour,
+				t.minute,
+				t.minute,
+				t.second,
+				t.second,
+				t.secondAndMillisecond,
+				t.timezone,
+				t.timezone,
+				t.timezone
+			];
+
+			for (i=0; i < RTokenKeys.length; i++) {
+				cacheProcessRtoken(RTokenKeys[i], RToken[i], tokens[i]);
+			}
+
+			g.hms = _.cache(_.sequence([g.H, g.m, g.s], g.timePartDelimiter));
+
+			g.t = cacheProcessCtoken("shortMeridian", t.meridian);
+			g.tt = cacheProcessCtoken("longMeridian", t.meridian);
+			g.zzz = cacheProcessCtoken("timezone", t.timezone);
+
+			g.timeSuffix = _.each(_.ignore(g.whiteSpace), _.set([ g.tt, g.zzz ]));
+			g.time = _.each(_.optional(_.ignore(_.stoken("T"))), g.hms, g.timeSuffix);
+		 },
+		 dateFormats: function () {
+			// pre-loaded rules for different date part order preferences
+			var _setfn = function () {
+				return  _.set(arguments, g.datePartDelimiter);
+			};
+			var i,
+			RTokenKeys = [
+				"d",
+				"dd",
+				"M",
+				"MM",
+				"y",
+				"yy",
+				"yyy",
+				"yyyy"
+			],
+			RToken = [
+				/^([0-2]\d|3[0-1]|\d)/,
+				/^([0-2]\d|3[0-1])/,
+				/^(1[0-2]|0\d|\d)/,
+				/^(1[0-2]|0\d)/,
+				/^(\d+)/,
+				/^(\d\d)/,
+				/^(\d\d?\d?\d?)/,
+				/^(\d\d\d\d)/
+			],
+			tokens = [
+				t.day,
+				t.day,
+				t.month,
+				t.month,
+				t.year,
+				t.year,
+				t.year,
+				t.year
+			],
+			eachToken = [
+				"ordinalSuffix",
+				"ordinalSuffix"
+			];
+			for (i=0; i < RTokenKeys.length; i++) {
+				cacheProcessRtoken(RTokenKeys[i], RToken[i], tokens[i], eachToken[i]);
+			}
+
+			g.MMM = g.MMMM = _.cache(_.process(g.ctoken("jan feb mar apr may jun jul aug sep oct nov dec"), t.month));
+			g.ddd = g.dddd = _.cache(_.process(g.ctoken("sun mon tue wed thu fri sat"),
+				function (s) {
+					return function () {
+						this.weekday = s;
+					};
+				}
+			));
+
+			g.day = _fn(g.d, g.dd);
+			g.month = _fn(g.M, g.MMM);
+			g.year = _fn(g.yyyy, g.yy);
+
+			g.mdy = _setfn(g.ddd, g.month, g.day, g.year);
+			g.ymd = _setfn(g.ddd, g.year, g.month, g.day);
+			g.dmy = _setfn(g.ddd, g.day, g.month, g.year);
+						
+			g.date = function (s) {
+				return ((g[Date.CultureInfo.dateElementOrder] || g.mdy).call(this, s));
+			};
+		 },
+		 relative: function () {
+			// relative date / time expressions
+			g.orientation = _.process(g.ctoken("past future"),
+				function (s) {
+					return function () {
+						this.orient = s;
+					};
+				}
+			);
+
+			g.operator = _.process(g.ctoken("add subtract"),
+				function (s) {
+					return function () {
+						this.operator = s;
+					};
+				}
+			);
+			g.rday = _.process(g.ctoken("yesterday tomorrow today now"), t.rday);
+			g.unit = _.process(g.ctoken("second minute hour day week month year"),
+				function (s) {
+					return function () {
+						this.unit = s;
+					};
+				}
+			);
+		 }
+	};
+
+	g.buildGrammarFormats = function () {
+		// these need to be rebuilt every time the language changes.
+		_C = {};
+
+		grammarFormats.timeFormats();
+		grammarFormats.dateFormats();
+		grammarFormats.relative();
+
+		
+		g.value = _.process(_.rtoken(/^([-+]?\d+)?(st|nd|rd|th)?/),
+			function (s) {
+				return function () {
+					this.value = s.replace(/\D/g, "");
+				};
+			}
+		);
+		g.expression = _.set([g.rday, g.operator, g.value, g.unit, g.orientation, g.ddd, g.MMM ]);
+
+		g.format = _.process(_.many(
+			_.any(
+				// translate format specifiers into grammar rules
+				_.process(
+					_.rtoken(/^(dd?d?d?(?!e)|MM?M?M?|yy?y?y?|hh?|HH?|mm?|ss?|tt?|zz?z?)/),
+						function (fmt) {
+							if (g[fmt]) {
+								return g[fmt];
+							} else {
+								throw $D.Parsing.Exception(fmt);
+							}
+						}
+					),
+					// translate separator tokens into token rules
+					_.process(_.rtoken(/^[^dMyhHmstz]+/), // all legal separators 
+						function (s) {
+							return _.ignore(_.stoken(s));
+						}
+					)
+				)
+			),
+			// construct the parser ...
+			function (rules) {
+				return _.process(_.each.apply(null, rules), t.finishExact);
+			}
+		);
+
+		// starting rule for general purpose grammar
+		g._start = _.process(_.set([ g.date, g.time, g.expression ],
+		g.generalDelimiter, g.whiteSpace), t.finish);
+	};
+
+	g.buildGrammarFormats();
+	// parsing date format specifiers - ex: "h:m:s tt" 
+	// this little guy will generate a custom parser based
+	// on the format string, ex: g.format("h:m:s tt")
+	// check for these formats first
+	g._formats = g.formats([
+		"\"yyyy-MM-ddTHH:mm:ssZ\"",
+		"yyyy-MM-ddTHH:mm:ss.sz",
+		"yyyy-MM-ddTHH:mm:ssZ",
+		"yyyy-MM-ddTHH:mm:ssz",
+		"yyyy-MM-ddTHH:mm:ss",
+		"yyyy-MM-ddTHH:mmZ",
+		"yyyy-MM-ddTHH:mmz",
+		"yyyy-MM-ddTHH:mm",
+		"ddd, MMM dd, yyyy H:mm:ss tt",
+		"ddd MMM d yyyy HH:mm:ss zzz",
+		"MMddyyyy",
+		"ddMMyyyy",
+		"Mddyyyy",
+		"ddMyyyy",
+		"Mdyyyy",
+		"dMyyyy",
+		"yyyy",
+		"Mdyy",
+		"dMyy",
+		"d"
+	]);
+	
+	// real starting rule: tries selected formats first, 
+	// then general purpose rule
+	g.start = function (s) {
+		try {
+			var r = g._formats.call({}, s);
+			if (r[1].length === 0) {
+				return r;
+			}
+		} catch (e) {}
+		return g._start.call({}, s);
+	};
+}());
+},{}],10:[function(require,module,exports){
+(function () {
+	var $P = Date.Parsing;
+	var _ = $P.Operators = {
+		//
+		// Tokenizers
+		//
+		rtoken: function (r) { // regex token
+			return function (s) {
+				var mx = s.match(r);
+				if (mx) {
+					return ([ mx[0], s.substring(mx[0].length) ]);
+				} else {
+					throw new $P.Exception(s);
+				}
+			};
+		},
+		token: function () { // whitespace-eating token
+			return function (s) {
+				return _.rtoken(new RegExp("^\\s*" + s + "\\s*"))(s);
+			};
+		},
+		stoken: function (s) { // string token
+			return _.rtoken(new RegExp("^" + s));
+		},
+
+		// Atomic Operators
+
+		until: function (p) {
+			return function (s) {
+				var qx = [], rx = null;
+				while (s.length) {
+					try {
+						rx = p.call(this, s);
+					} catch (e) {
+						qx.push(rx[0]);
+						s = rx[1];
+						continue;
+					}
+					break;
+				}
+				return [ qx, s ];
+			};
+		},
+		many: function (p) {
+			return function (s) {
+				var rx = [], r = null;
+				while (s.length) {
+					try {
+						r = p.call(this, s);
+					} catch (e) {
+						return [ rx, s ];
+					}
+					rx.push(r[0]);
+					s = r[1];
+				}
+				return [ rx, s ];
+			};
+		},
+
+		// generator operators -- see below
+		optional: function (p) {
+			return function (s) {
+				var r = null;
+				try {
+					r = p.call(this, s);
+				} catch (e) {
+					return [ null, s ];
+				}
+				return [ r[0], r[1] ];
+			};
+		},
+		not: function (p) {
+			return function (s) {
+				try {
+					p.call(this, s);
+				} catch (e) {
+					return [null, s];
+				}
+				throw new $P.Exception(s);
+			};
+		},
+		ignore: function (p) {
+			return p ?
+			function (s) {
+				var r = null;
+				r = p.call(this, s);
+				return [null, r[1]];
+			} : null;
+		},
+		product: function () {
+			var px = arguments[0],
+			qx = Array.prototype.slice.call(arguments, 1), rx = [];
+			for (var i = 0 ; i < px.length ; i++) {
+				rx.push(_.each(px[i], qx));
+			}
+			return rx;
+		},
+		cache: function (rule) {
+			var cache = {}, cache_length = 0, cache_keys = [], CACHE_MAX = Date.Config.CACHE_MAX || 100000, r = null;
+			var cacheCheck = function () {
+				if (cache_length === CACHE_MAX) {
+					// kill several keys, don't want to have to do this all the time...
+					for (var i=0; i < 10; i++) {
+						var key = cache_keys.shift();
+						if (key) {
+							delete cache[key];
+							cache_length--;
+						}
+					}
+				}
+			};
+			return function (s) {
+				cacheCheck();
+				try {
+					r = cache[s] = (cache[s] || rule.call(this, s));
+				} catch (e) {
+					r = cache[s] = e;
+				}
+				cache_length++;
+				cache_keys.push(s);
+				if (r instanceof $P.Exception) {
+					throw r;
+				} else {
+					return r;
+				}
+			};
+		},
+
+		// vector operators -- see below
+		any: function () {
+			var px = arguments;
+			return function (s) {
+				var r = null;
+				for (var i = 0; i < px.length; i++) {
+					if (px[i] == null) {
+						continue;
+					}
+					try {
+						r = (px[i].call(this, s));
+					} catch (e) {
+						r = null;
+					}
+					if (r) {
+						return r;
+					}
+				}
+				throw new $P.Exception(s);
+			};
+		},
+		each: function () {
+			var px = arguments;
+			return function (s) {
+				var rx = [], r = null;
+				for (var i = 0; i < px.length ; i++) {
+					if (px[i] == null) {
+						continue;
+					}
+					try {
+						r = (px[i].call(this, s));
+					} catch (e) {
+						throw new $P.Exception(s);
+					}
+					rx.push(r[0]);
+					s = r[1];
+				}
+				return [ rx, s];
+			};
+		},
+		all: function () {
+			var px = arguments, _ = _;
+			return _.each(_.optional(px));
+		},
+
+		// delimited operators
+		sequence: function (px, d, c) {
+			d = d || _.rtoken(/^\s*/);
+			c = c || null;
+			
+			if (px.length === 1) {
+				return px[0];
+			}
+			return function (s) {
+				var r = null, q = null;
+				var rx = [];
+				for (var i = 0; i < px.length ; i++) {
+					try {
+						r = px[i].call(this, s);
+					} catch (e) {
+						break;
+					}
+					rx.push(r[0]);
+					try {
+						q = d.call(this, r[1]);
+					} catch (ex) {
+						q = null;
+						break;
+					}
+					s = q[1];
+				}
+				if (!r) {
+					throw new $P.Exception(s);
+				}
+				if (q) {
+					throw new $P.Exception(q[1]);
+				}
+				if (c) {
+					try {
+						r = c.call(this, r[1]);
+					} catch (ey) {
+						throw new $P.Exception(r[1]);
+					}
+				}
+				return [ rx, (r?r[1]:s) ];
+			};
+		},
+
+		//
+		// Composite Operators
+		//
+
+		between: function (d1, p, d2) {
+			d2 = d2 || d1;
+			var _fn = _.each(_.ignore(d1), p, _.ignore(d2));
+			return function (s) {
+				var rx = _fn.call(this, s);
+				return [[rx[0][0], r[0][2]], rx[1]];
+			};
+		},
+		list: function (p, d, c) {
+			d = d || _.rtoken(/^\s*/);
+			c = c || null;
+			return (p instanceof Array ?
+				_.each(_.product(p.slice(0, -1), _.ignore(d)), p.slice(-1), _.ignore(c)) :
+				_.each(_.many(_.each(p, _.ignore(d))), px, _.ignore(c)));
+		},
+		set: function (px, d, c) {
+			d = d || _.rtoken(/^\s*/);
+			c = c || null;
+			return function (s) {
+				// r is the current match, best the current 'best' match
+				// which means it parsed the most amount of input
+				var r = null, p = null, q = null, rx = null, best = [[], s], last = false;
+				// go through the rules in the given set
+				for (var i = 0; i < px.length ; i++) {
+
+					// last is a flag indicating whether this must be the last element
+					// if there is only 1 element, then it MUST be the last one
+					q = null;
+					p = null;
+					r = null;
+					last = (px.length === 1);
+					// first, we try simply to match the current pattern
+					// if not, try the next pattern
+					try {
+						r = px[i].call(this, s);
+					} catch (e) {
+						continue;
+					}
+					// since we are matching against a set of elements, the first
+					// thing to do is to add r[0] to matched elements
+					rx = [[r[0]], r[1]];
+					// if we matched and there is still input to parse and 
+					// we don't already know this is the last element,
+					// we're going to next check for the delimiter ...
+					// if there's none, or if there's no input left to parse
+					// than this must be the last element after all ...
+					if (r[1].length > 0 && ! last) {
+						try {
+							q = d.call(this, r[1]);
+						} catch (ex) {
+							last = true;
+						}
+					} else {
+						last = true;
+					}
+
+					// if we parsed the delimiter and now there's no more input,
+					// that means we shouldn't have parsed the delimiter at all
+					// so don't update r and mark this as the last element ...
+					if (!last && q[1].length === 0) {
+						last = true;
+					}
+
+
+					// so, if this isn't the last element, we're going to see if
+					// we can get any more matches from the remaining (unmatched)
+					// elements ...
+					if (!last) {
+						// build a list of the remaining rules we can match against,
+						// i.e., all but the one we just matched against
+						var qx = [];
+						for (var j = 0; j < px.length ; j++) {
+							if (i !== j) {
+								qx.push(px[j]);
+							}
+						}
+
+						// now invoke recursively set with the remaining input
+						// note that we don't include the closing delimiter ...
+						// we'll check for that ourselves at the end
+						p = _.set(qx, d).call(this, q[1]);
+
+						// if we got a non-empty set as a result ...
+						// (otw rx already contains everything we want to match)
+						if (p[0].length > 0) {
+							// update current result, which is stored in rx ...
+							// basically, pick up the remaining text from p[1]
+							// and concat the result from p[0] so that we don't
+							// get endless nesting ...
+							rx[0] = rx[0].concat(p[0]);
+							rx[1] = p[1];
+						}
+					}
+
+					// at this point, rx either contains the last matched element
+					// or the entire matched set that starts with this element.
+
+					// now we just check to see if this variation is better than
+					// our best so far, in terms of how much of the input is parsed
+					if (rx[1].length < best[1].length) {
+						best = rx;
+					}
+
+					// if we've parsed all the input, then we're finished
+					if (best[1].length === 0) {
+						break;
+					}
+				}
+
+				// so now we've either gone through all the patterns trying them
+				// as the initial match; or we found one that parsed the entire
+				// input string ...
+
+				// if best has no matches, just return empty set ...
+				if (best[0].length === 0) {
+					return best;
+				}
+
+				// if a closing delimiter is provided, then we have to check it also
+				if (c) {
+					// we try this even if there is no remaining input because the pattern
+					// may well be optional or match empty input ...
+					try {
+						q = c.call(this, best[1]);
+					} catch (ey) {
+						throw new $P.Exception(best[1]);
+					}
+
+					// it parsed ... be sure to update the best match remaining input
+					best[1] = q[1];
+				}
+				// if we're here, either there was no closing delimiter or we parsed it
+				// so now we have the best match; just return it!
+				return best;
+			};
+		},
+		forward: function (gr, fname) {
+			return function (s) {
+				return gr[fname].call(this, s);
+			};
+		},
+
+		//
+		// Translation Operators
+		//
+		replace: function (rule, repl) {
+			return function (s) {
+				var r = rule.call(this, s);
+				return [repl, r[1]];
+			};
+		},
+		process: function (rule, fn) {
+			return function (s) {
+				var r = rule.call(this, s);
+				return [fn.call(this, r[0]), r[1]];
+			};
+		},
+		min: function (min, rule) {
+			return function (s) {
+				var rx = rule.call(this, s);
+				if (rx[0].length < min) {
+					throw new $P.Exception(s);
+				}
+				return rx;
+			};
+		}
+	};
+	
+
+	// Generator Operators And Vector Operators
+
+	// Generators are operators that have a signature of F(R) => R,
+	// taking a given rule and returning another rule, such as 
+	// ignore, which parses a given rule and throws away the result.
+
+	// Vector operators are those that have a signature of F(R1,R2,...) => R,
+	// take a list of rules and returning a new rule, such as each.
+
+	// Generator operators are converted (via the following _generator
+	// function) into functions that can also take a list or array of rules
+	// and return an array of new rules as though the function had been
+	// called on each rule in turn (which is what actually happens).
+
+	// This allows generators to be used with vector operators more easily.
+	// Example:
+	// each(ignore(foo, bar)) instead of each(ignore(foo), ignore(bar))
+
+	// This also turns generators into vector operators, which allows
+	// constructs like:
+	// not(cache(foo, bar))
+	
+	var _generator = function (op) {
+		function gen() {
+			var args = null, rx = [], px, i;
+			if (arguments.length > 1) {
+				args = Array.prototype.slice.call(arguments);
+			} else if (arguments[0] instanceof Array) {
+				args = arguments[0];
+			}
+			if (args) {
+				px = args.shift();
+				if (px.length > 0) {
+					args.unshift(px[i]);
+					rx.push(op.apply(null, args));
+					args.shift();
+					return rx;
+				}
+			} else {
+				return op.apply(null, arguments);
+			}
+		}
+
+		return gen;
+	};
+	
+	var gx = "optional not ignore cache".split(/\s/);
+	
+	for (var i = 0 ; i < gx.length ; i++) {
+		_[gx[i]] = _generator(_[gx[i]]);
+	}
+
+	var _vector = function (op) {
+		return function () {
+			if (arguments[0] instanceof Array) {
+				return op.apply(null, arguments[0]);
+			} else {
+				return op.apply(null, arguments);
+			}
+		};
+	};
+	
+	var vx = "each any all".split(/\s/);
+	
+	for (var j = 0 ; j < vx.length ; j++) {
+		_[vx[j]] = _vector(_[vx[j]]);
+	}
+	
+}());
+},{}],11:[function(require,module,exports){
+(function () {
+	var $D = Date;
+
+	var flattenAndCompact = function (ax) {
+		var rx = [];
+		for (var i = 0; i < ax.length; i++) {
+			if (ax[i] instanceof Array) {
+				rx = rx.concat(flattenAndCompact(ax[i]));
+			} else {
+				if (ax[i]) {
+					rx.push(ax[i]);
+				}
+			}
+		}
+		return rx;
+	};
+
+	var parseMeridian = function () {
+		if (this.meridian && (this.hour || this.hour === 0)) {
+			if (this.meridian === "a" && this.hour > 11 && Date.Config.strict24hr){
+				throw "Invalid hour and meridian combination";
+			} else if (this.meridian === "p" && this.hour < 12 && Date.Config.strict24hr){
+				throw "Invalid hour and meridian combination";
+			} else if (this.meridian === "p" && this.hour < 12) {
+				this.hour = this.hour + 12;
+			} else if (this.meridian === "a" && this.hour === 12) {
+				this.hour = 0;
+			}
+		}
+	};
+
+	var setDefaults = function () {
+		var now = new Date();
+		if ((this.hour || this.minute) && (!this.month && !this.year && !this.day)) {
+			this.day = now.getDate();
+		}
+
+		if (!this.year) {
+			this.year = now.getFullYear();
+		}
+		
+		if (!this.month && this.month !== 0) {
+			this.month = now.getMonth();
+		}
+		
+		if (!this.day) {
+			this.day = 1;
+		}
+		
+		if (!this.hour) {
+			this.hour = 0;
+		}
+		
+		if (!this.minute) {
+			this.minute = 0;
+		}
+
+		if (!this.second) {
+			this.second = 0;
+		}
+		if (!this.millisecond) {
+			this.millisecond = 0;
+		}
+	};
+
+	var finishUtils = {
+		getToday: function () {
+			 if (this.now || "hour minute second".indexOf(this.unit) !== -1) {
+				return new Date();
+			} else {
+				return $D.today();
+			}
+		},
+		setDaysFromWeekday: function (today, orient){
+			var gap;
+			orient = orient || 1;
+			this.unit = "day";
+			gap = ($D.getDayNumberFromName(this.weekday) - today.getDay());
+			this.days = gap ? ((gap + (orient * 7)) % 7) : (orient * 7);
+			return this;
+		},
+		setMonthsFromMonth: function (today, orient) {
+			var gap;
+			orient = orient || 1;
+			this.unit = "month";
+			gap = (this.month - today.getMonth());
+			this.months = gap ? ((gap + (orient * 12)) % 12) : (orient * 12);
+			this.month = null;
+			return this;
+		},
+		setDMYFromWeekday: function () {
+			var d = Date[this.weekday]();
+			this.day = d.getDate();
+			if (!this.month) {
+				this.month = d.getMonth();
+			}
+			this.year = d.getFullYear();
+			return this;
+		},
+		setUnitValue: function (orient) {
+			if (!this.value && this.operator && this.operator !== null && this[this.unit + "s"] && this[this.unit + "s"] !== null) {
+				this[this.unit + "s"] = this[this.unit + "s"] + ((this.operator === "add") ? 1 : -1) + (this.value||0) * orient;
+			} else if (this[this.unit + "s"] == null || this.operator != null) {
+				if (!this.value) {
+					this.value = 1;
+				}
+				this[this.unit + "s"] = this.value * orient;
+			}
+		},
+		generateDateFromWeeks: function () {
+			var weekday = (this.weekday !== undefined) ? this.weekday : "today";
+			var d = Date[weekday]().addWeeks(this.weeks);
+			if (this.now) {
+				d.setTimeToNow();
+			}
+			return d;
+		}
+	};
+
+	$D.Translator = {
+		hour: function (s) {
+			return function () {
+				this.hour = Number(s);
+			};
+		},
+		minute: function (s) {
+			return function () {
+				this.minute = Number(s);
+			};
+		},
+		second: function (s) {
+			return function () {
+				this.second = Number(s);
+			};
+		},
+		/* for ss.s format */
+		secondAndMillisecond: function (s) {
+			return function () {
+				var mx = s.match(/^([0-5][0-9])\.([0-9]{1,3})/);
+				this.second = Number(mx[1]);
+				this.millisecond = Number(mx[2]);
+			};
+		},
+		meridian: function (s) {
+			return function () {
+				this.meridian = s.slice(0, 1).toLowerCase();
+			};
+		},
+		timezone: function (s) {
+			return function () {
+				var n = s.replace(/[^\d\+\-]/g, "");
+				if (n.length) {
+					this.timezoneOffset = Number(n);
+				} else {
+					this.timezone = s.toLowerCase();
+				}
+			};
+		},
+		day: function (x) {
+			var s = x[0];
+			return function () {
+				this.day = Number(s.match(/\d+/)[0]);
+				if (this.day < 1) {
+					throw "invalid day";
+				}
+			};
+		},
+		month: function (s) {
+			return function () {
+				this.month = (s.length === 3) ? "jan feb mar apr may jun jul aug sep oct nov dec".indexOf(s)/4 : Number(s) - 1;
+				if (this.month < 0) {
+					throw "invalid month";
+				}
+			};
+		},
+		year: function (s) {
+			return function () {
+				var n = Number(s);
+				this.year = ((s.length > 2) ? n :
+					(n + (((n + 2000) < Date.CultureInfo.twoDigitYearMax) ? 2000 : 1900)));
+			};
+		},
+		rday: function (s) {
+			return function () {
+				switch (s) {
+					case "yesterday":
+						this.days = -1;
+						break;
+					case "tomorrow":
+						this.days = 1;
+						break;
+					case "today":
+						this.days = 0;
+						break;
+					case "now":
+						this.days = 0;
+						this.now = true;
+						break;
+				}
+			};
+		},
+		finishExact: function (x) {
+			var d;
+			x = (x instanceof Array) ? x : [x];
+
+			for (var i = 0 ; i < x.length ; i++) {
+				if (x[i]) {
+					x[i].call(this);
+				}
+			}
+			
+			setDefaults.call(this);
+			parseMeridian.call(this);
+
+			if (this.day > $D.getDaysInMonth(this.year, this.month)) {
+				throw new RangeError(this.day + " is not a valid value for days.");
+			}
+
+			d = new Date(this.year, this.month, this.day, this.hour, this.minute, this.second, this.millisecond);
+			if (this.year < 100) {
+				d.setFullYear(this.year); // means years less that 100 are process correctly. JS will parse it otherwise as 1900-1999.
+			}
+			if (this.timezone) {
+				d.set({ timezone: this.timezone });
+			} else if (this.timezoneOffset) {
+				d.set({ timezoneOffset: this.timezoneOffset });
+			}
+			
+			return d;
+		},
+		finish: function (x) {
+			var today, expression, orient, temp;
+
+			x = (x instanceof Array) ? flattenAndCompact(x) : [ x ];
+
+			if (x.length === 0) {
+				return null;
+			}
+
+			for (var i = 0 ; i < x.length ; i++) {
+				if (typeof x[i] === "function") {
+					x[i].call(this);
+				}
+			}
+			if (this.now && !this.unit && !this.operator) {
+				return new Date();
+			} else {
+				today = finishUtils.getToday.call(this);
+			}
+			
+			expression = !!(this.days && this.days !== null || this.orient || this.operator);
+			orient = ((this.orient === "past" || this.operator === "subtract") ? -1 : 1);
+
+			if (this.month && this.unit === "week") {
+				this.value = this.month + 1;
+				delete this.month;
+				delete this.day;
+			}
+
+			if ((this.month || this.month === 0) && "year day hour minute second".indexOf(this.unit) !== -1) {
+				if (!this.value) {
+					this.value = this.month + 1;
+				}
+				this.month = null;
+				expression = true;
+			}
+
+			if (!expression && this.weekday && !this.day && !this.days) {
+				finishUtils.setDMYFromWeekday.call(this);
+			}
+
+			if (expression && this.weekday && this.unit !== "month" && this.unit !== "week") {
+				finishUtils.setDaysFromWeekday.call(this, today, orient);
+			}
+
+			if (this.weekday && this.unit !== "week" && !this.day && !this.days) {
+				temp = Date[this.weekday]();
+				this.day = temp.getDate();
+				if (temp.getMonth() !== today.getMonth()) {
+					this.month = temp.getMonth();
+				}
+			}
+
+			if (this.month && this.unit === "day" && this.operator) {
+				if (!this.value) {
+					this.value = (this.month + 1);
+				}
+				this.month = null;
+			}
+
+			if (this.value != null && this.month != null && this.year != null) {
+				this.day = this.value * 1;
+			}
+
+			if (this.month && !this.day && this.value) {
+				today.set({ day: this.value * 1 });
+				if (!expression) {
+					this.day = this.value * 1;
+				}
+			}
+
+			if (!this.month && this.value && this.unit === "month" && !this.now) {
+				this.month = this.value;
+				expression = true;
+			}
+
+			if (expression && (this.month || this.month === 0) && this.unit !== "year") {
+				finishUtils.setMonthsFromMonth.call(this, today, orient);
+			}
+
+			if (!this.unit) {
+				this.unit = "day";
+			}
+
+			finishUtils.setUnitValue.call(this, orient);
+			parseMeridian.call(this);
+			
+			if ((this.month || this.month === 0) && !this.day) {
+				this.day = 1;
+			}
+
+			if (!this.orient && !this.operator && this.unit === "week" && this.value && !this.day && !this.month) {
+				return Date.today().setWeek(this.value);
+			}
+
+			if (this.unit === "week" && this.weeks && !this.day && !this.month) {
+				return finishUtils.generateDateFromWeeks.call(this);
+			}
+
+			if (expression && this.timezone && this.day && this.days) {
+				this.day = this.days;
+			}
+
+			if (expression){
+				today.add(this);
+			} else {
+				today.set(this);
+			}
+			
+			if (this.timezone) {
+				this.timezone = this.timezone.toUpperCase();
+				var offset = $D.getTimezoneOffset(this.timezone);
+				var timezone;
+				if (today.hasDaylightSavingTime()) {
+					// lets check that we're being sane with timezone setting
+					timezone = $D.getTimezoneAbbreviation(offset, today.isDaylightSavingTime());
+					if (timezone !== this.timezone) {
+						// bugger, we're in a place where things like EST vs EDT matters.
+						if (today.isDaylightSavingTime()) {
+							today.addHours(-1);
+						} else {
+							today.addHours(1);
+						}
+					}
+				}
+				today.setTimezoneOffset(offset);
+			}
+
+			return today;
+		}
+	};
+}());
+},{}],12:[function(require,module,exports){
+/*************************************************************
+ * SugarPak - Domain Specific Language -  Syntactical Sugar  *
+ *************************************************************/
+ 
+(function () {
+	var $D = Date, $P = $D.prototype, $N = Number.prototype;
+
+	// private
+	$P._orient = +1;
+
+	// private
+	$P._nth = null;
+
+	// private
+	$P._is = false;
+
+	// private
+	$P._same = false;
+	
+	// private
+	$P._isSecond = false;
+
+	// private
+	$N._dateElement = "days";
+
+	/** 
+	 * Moves the date to the next instance of a date as specified by the subsequent date element function (eg. .day(), .month()), month name function (eg. .january(), .jan()) or day name function (eg. .friday(), fri()).
+	 * Example
+	<pre><code>
+	Date.today().next().friday();
+	Date.today().next().fri();
+	Date.today().next().march();
+	Date.today().next().mar();
+	Date.today().next().week();
+	</code></pre>
+	 * 
+	 * @return {Date}    date
+	 */
+	$P.next = function () {
+		this._move = true;
+		this._orient = +1;
+		return this;
+	};
+
+	/** 
+	 * Creates a new Date (Date.today()) and moves the date to the next instance of the date as specified by the subsequent date element function (eg. .day(), .month()), month name function (eg. .january(), .jan()) or day name function (eg. .friday(), fri()).
+	 * Example
+	<pre><code>
+	Date.next().friday();
+	Date.next().fri();
+	Date.next().march();
+	Date.next().mar();
+	Date.next().week();
+	</code></pre>
+	 * 
+	 * @return {Date}    date
+	 */
+	$D.next = function () {
+		return $D.today().next();
+	};
+
+	/** 
+	 * Moves the date to the previous instance of a date as specified by the subsequent date element function (eg. .day(), .month()), month name function (eg. .january(), .jan()) or day name function (eg. .friday(), fri()).
+	 * Example
+	<pre><code>
+	Date.today().last().friday();
+	Date.today().last().fri();
+	Date.today().last().march();
+	Date.today().last().mar();
+	Date.today().last().week();
+	</code></pre>
+	 *  
+	 * @return {Date}    date
+	 */
+	$P.last = $P.prev = $P.previous = function () {
+		this._move = true;
+		this._orient = -1;
+		return this;
+	};
+
+	/** 
+	 * Creates a new Date (Date.today()) and moves the date to the previous instance of the date as specified by the subsequent date element function (eg. .day(), .month()), month name function (eg. .january(), .jan()) or day name function (eg. .friday(), fri()).
+	 * Example
+	<pre><code>
+	Date.last().friday();
+	Date.last().fri();
+	Date.previous().march();
+	Date.prev().mar();
+	Date.last().week();
+	</code></pre>
+	 *  
+	 * @return {Date}    date
+	 */
+	$D.last = $D.prev = $D.previous = function () {
+		return $D.today().last();
+	};
+
+	/** 
+	 * Performs a equality check when followed by either a month name, day name or .weekday() function.
+	 * Example
+	<pre><code>
+	Date.today().is().friday(); // true|false
+	Date.today().is().fri();
+	Date.today().is().march();
+	Date.today().is().mar();
+	</code></pre>
+	 *  
+	 * @return {Boolean}    true|false
+	 */
+	$P.is = function () {
+		this._is = true;
+		return this;
+	};
+
+	/** 
+	 * Determines if two date objects occur on/in exactly the same instance of the subsequent date part function.
+	 * The function .same() must be followed by a date part function (example: .day(), .month(), .year(), etc).
+	 *
+	 * An optional Date can be passed in the date part function. If now date is passed as a parameter, 'Now' is used. 
+	 *
+	 * The following example demonstrates how to determine if two dates fall on the exact same day.
+	 *
+	 * Example
+	<pre><code>
+	var d1 = Date.today(); // today at 00:00
+	var d2 = new Date();   // exactly now.
+
+	// Do they occur on the same day?
+	d1.same().day(d2); // true
+	
+	// Do they occur on the same hour?
+	d1.same().hour(d2); // false, unless d2 hour is '00' (midnight).
+	
+	// What if it's the same day, but one year apart?
+	var nextYear = Date.today().add(1).year();
+
+	d1.same().day(nextYear); // false, because the dates must occur on the exact same day. 
+	</code></pre>
+	 *
+	 * Scenario: Determine if a given date occurs during some week period 2 months from now. 
+	 *
+	 * Example
+	<pre><code>
+	var future = Date.today().add(2).months();
+	return someDate.same().week(future); // true|false;
+	</code></pre>
+	 *  
+	 * @return {Boolean}    true|false
+	 */
+	$P.same = function () {
+		this._same = true;
+		this._isSecond = false;
+		return this;
+	};
+
+	/** 
+	 * Determines if the current date/time occurs during Today. Must be preceded by the .is() function.
+	 * Example
+	<pre><code>
+	someDate.is().today();    // true|false
+	new Date().is().today();  // true
+	Date.today().is().today();// true
+	Date.today().add(-1).day().is().today(); // false
+	</code></pre>
+	 *  
+	 * @return {Boolean}    true|false
+	 */
+	$P.today = function () {
+		return this.same().day();
+	};
+
+	/** 
+	 * Determines if the current date is a weekday. This function must be preceded by the .is() function.
+	 * Example
+	<pre><code>
+	Date.today().is().weekday(); // true|false
+	</code></pre>
+	 *  
+	 * @return {Boolean}    true|false
+	 */
+	$P.weekday = function () {
+		if (this._nth) {
+			return df("Weekday").call(this);
+		}
+		if (this._move) {
+			return this.addWeekdays(this._orient);
+		}
+		if (this._is) {
+			this._is = false;
+			return (!this.is().sat() && !this.is().sun());
+		}
+		return false;
+	};
+	/** 
+	 * Determines if the current date is on the weekend. This function must be preceded by the .is() function.
+	 * Example
+	<pre><code>
+	Date.today().is().weekend(); // true|false
+	</code></pre>
+	 *  
+	 * @return {Boolean}    true|false
+	 */
+	$P.weekend = function () {
+		if (this._is) {
+			this._is = false;
+			return (this.is().sat() || this.is().sun());
+		}
+		return false;
+	};
+
+	/** 
+	 * Sets the Time of the current Date instance. A string "6:15 pm" or config object {hour:18, minute:15} are accepted.
+	 * Example
+	<pre><code>
+	// Set time to 6:15pm with a String
+	Date.today().at("6:15pm");
+
+	// Set time to 6:15pm with a config object
+	Date.today().at({hour:18, minute:15});
+	</code></pre>
+	 *  
+	 * @return {Date}    date
+	 */
+	$P.at = function (time) {
+		return (typeof time === "string") ? $D.parse(this.toString("d") + " " + time) : this.set(time);
+	};
+		
+	/** 
+	 * Creates a new Date() and adds this (Number) to the date based on the preceding date element function (eg. second|minute|hour|day|month|year).
+	 * Example
+	<pre><code>
+	// Undeclared Numbers must be wrapped with parentheses. Requirment of JavaScript.
+	(3).days().fromNow();
+	(6).months().fromNow();
+
+	// Declared Number variables do not require parentheses. 
+	var n = 6;
+	n.months().fromNow();
+	</code></pre>
+	 *  
+	 * @return {Date}    A new Date instance
+	 */
+	$N.fromNow = $N.after = function (date) {
+		var c = {};
+		c[this._dateElement] = this;
+		return ((!date) ? new Date() : date.clone()).add(c);
+	};
+
+	/** 
+	 * Creates a new Date() and subtract this (Number) from the date based on the preceding date element function (eg. second|minute|hour|day|month|year).
+	 * Example
+	<pre><code>
+	// Undeclared Numbers must be wrapped with parentheses. Requirment of JavaScript.
+	(3).days().ago();
+	(6).months().ago();
+
+	// Declared Number variables do not require parentheses. 
+	var n = 6;
+	n.months().ago();
+	</code></pre>
+	 *  
+	 * @return {Date}    A new Date instance
+	 */
+	$N.ago = $N.before = function (date) {
+		var c = {},
+		s = (this._dateElement[this._dateElement.length-1] !== "s") ? this._dateElement + "s" : this._dateElement;
+		c[s] = this * -1;
+		return ((!date) ? new Date() : date.clone()).add(c);
+	};
+
+	// Do NOT modify the following string tokens. These tokens are used to build dynamic functions.
+	// All culture-specific strings can be found in the CultureInfo files.
+	var dx = ("sunday monday tuesday wednesday thursday friday saturday").split(/\s/),
+		mx = ("january february march april may june july august september october november december").split(/\s/),
+		px = ("Millisecond Second Minute Hour Day Week Month Year Quarter Weekday").split(/\s/),
+		pxf = ("Milliseconds Seconds Minutes Hours Date Week Month FullYear Quarter").split(/\s/),
+		nth = ("final first second third fourth fifth").split(/\s/),
+		de;
+
+   /** 
+	 * Returns an object literal of all the date parts.
+	 * Example
+	<pre><code>
+	var o = new Date().toObject();
+	
+	// { year: 2008, month: 4, week: 20, day: 13, hour: 18, minute: 9, second: 32, millisecond: 812 }
+	
+	// The object properties can be referenced directly from the object.
+	
+	alert(o.day);  // alerts "13"
+	alert(o.year); // alerts "2008"
+	</code></pre>
+	 *  
+	 * @return {Date}    An object literal representing the original date object.
+	 */
+	$P.toObject = function () {
+		var o = {};
+		for (var i = 0; i < px.length; i++) {
+			if (this["get" + pxf[i]]) {
+				o[px[i].toLowerCase()] = this["get" + pxf[i]]();
+			}
+		}
+		return o;
+	};
+   
+   /** 
+	 * Returns a date created from an object literal. Ignores the .week property if set in the config. 
+	 * Example
+	<pre><code>
+	var o = new Date().toObject();
+	
+	return Date.fromObject(o); // will return the same date. 
+
+	var o2 = {month: 1, day: 20, hour: 18}; // birthday party!
+	Date.fromObject(o2);
+	</code></pre>
+	 *  
+	 * @return {Date}    An object literal representing the original date object.
+	 */
+	$D.fromObject = function(config) {
+		config.week = null;
+		return Date.today().set(config);
+	};
+		
+	// Create day name functions and abbreviated day name functions (eg. monday(), friday(), fri()).
+	
+	var df = function (n) {
+		return function () {
+			if (this._is) {
+				this._is = false;
+				return this.getDay() === n;
+			}
+			if (this._move) { this._move = null; }
+			if (this._nth !== null) {
+				// If the .second() function was called earlier, remove the _orient 
+				// from the date, and then continue.
+				// This is required because 'second' can be used in two different context.
+				// 
+				// Example
+				//
+				//   Date.today().add(1).second();
+				//   Date.march().second().monday();
+				// 
+				// Things get crazy with the following...
+				//   Date.march().add(1).second().second().monday(); // but it works!!
+				//  
+				if (this._isSecond) {
+					this.addSeconds(this._orient * -1);
+				}
+				// make sure we reset _isSecond
+				this._isSecond = false;
+
+				var ntemp = this._nth;
+				this._nth = null;
+				var temp = this.clone().moveToLastDayOfMonth();
+				this.moveToNthOccurrence(n, ntemp);
+				if (this > temp) {
+					throw new RangeError($D.getDayName(n) + " does not occur " + ntemp + " times in the month of " + $D.getMonthName(temp.getMonth()) + " " + temp.getFullYear() + ".");
+				}
+				return this;
+			}
+			return this.moveToDayOfWeek(n, this._orient);
+		};
+	};
+	
+	var sdf = function (n) {
+		return function () {
+			var t = $D.today(), shift = n - t.getDay();
+			if (n === 0 && Date.CultureInfo.firstDayOfWeek === 1 && t.getDay() !== 0) {
+				shift = shift + 7;
+			}
+			return t.addDays(shift);
+		};
+	};
+	
+
+	
+	// Create month name functions and abbreviated month name functions (eg. january(), march(), mar()).
+	var month_instance_functions = function (n) {
+		return function () {
+			if (this._is) {
+				this._is = false;
+				return this.getMonth() === n;
+			}
+			return this.moveToMonth(n, this._orient);
+		};
+	};
+	
+	var month_static_functions = function (n) {
+		return function () {
+			return $D.today().set({ month: n, day: 1 });
+		};
+	};
+	
+	var processTerms = function (names, staticFunc, instanceFunc) {
+		for (var i = 0; i < names.length; i++) {
+			// Create constant static Name variables.
+			$D[names[i].toUpperCase()] = $D[names[i].toUpperCase().substring(0, 3)] = i;
+			// Create Name functions.
+			$D[names[i]] = $D[names[i].substring(0, 3)] = staticFunc(i);
+			// Create Name instance functions.
+			$P[names[i]] = $P[names[i].substring(0, 3)] = instanceFunc(i);
+		}
+
+	};
+
+	processTerms(dx, sdf, df);
+	processTerms(mx, month_static_functions, month_instance_functions);
+	
+	// Create date element functions and plural date element functions used with Date (eg. day(), days(), months()).
+	var ef = function (j) {
+		return function () {
+			// if the .second() function was called earlier, the _orient 
+			// has alread been added. Just return this and reset _isSecond.
+			if (this._isSecond) {
+				this._isSecond = false;
+				return this;
+			}
+
+			if (this._same) {
+				this._same = this._is = false;
+				var o1 = this.toObject(),
+					o2 = (arguments[0] || new Date()).toObject(),
+					v = "",
+					k = j.toLowerCase();
+
+				// the substr trick with -1 doesn't work in IE8 or less
+				k = (k[k.length-1] === "s") ? k.substring(0,k.length-1) : k;
+					
+				for (var m = (px.length - 1); m > -1; m--) {
+					v = px[m].toLowerCase();
+					if (o1[v] !== o2[v]) {
+						return false;
+					}
+					if (k === v) {
+						break;
+					}
+				}
+				return true;
+			}
+			
+			if (j.substring(j.length - 1) !== "s") {
+				j += "s";
+			}
+			if (this._move) { this._move = null; }
+			return this["add" + j](this._orient);
+		};
+	};
+	
+	
+	var nf = function (n) {
+		return function () {
+			this._dateElement = n;
+			return this;
+		};
+	};
+   
+	for (var k = 0; k < px.length; k++) {
+		de = px[k].toLowerCase();
+		if(de !== "weekday") {
+			// Create date element functions and plural date element functions used with Date (eg. day(), days(), months()).
+			$P[de] = $P[de + "s"] = ef(px[k]);
+			
+			// Create date element functions and plural date element functions used with Number (eg. day(), days(), months()).
+			$N[de] = $N[de + "s"] = nf(de + "s");
+		}
+	}
+	
+	$P._ss = ef("Second");
+	
+	var nthfn = function (n) {
+		return function (dayOfWeek) {
+			if (this._same) {
+				return this._ss(arguments[0]);
+			}
+			if (dayOfWeek || dayOfWeek === 0) {
+				return this.moveToNthOccurrence(dayOfWeek, n);
+			}
+			this._nth = n;
+
+			// if the operator is 'second' add the _orient, then deal with it later...
+			if (n === 2 && (dayOfWeek === undefined || dayOfWeek === null)) {
+				this._isSecond = true;
+				return this.addSeconds(this._orient);
+			}
+			return this;
+		};
+	};
+
+	for (var l = 0; l < nth.length; l++) {
+		$P[nth[l]] = (l === 0) ? nthfn(-1) : nthfn(l);
+	}
+}());
+
+},{}],13:[function(require,module,exports){
+(function () {
+	"use strict";
+	var attrs = ["years", "months", "days", "hours", "minutes", "seconds", "milliseconds"];
+	var gFn = function (attr) {
+		return function () {
+			return this[attr];
+		};
+	};
+	
+	var sFn = function (attr) {
+		return function (val) {
+			this[attr] = val;
+			return this;
+		};
+	};
+	var addSetFuncs = function (context, attrs) {
+		for (var i = 0; i < attrs.length ; i++) {
+			var $a = attrs[i], $b = $a.slice(0, 1).toUpperCase() + $a.slice(1);
+			context.prototype[$a] = 0;
+			context.prototype["get" + $b] = gFn($a);
+			context.prototype["set" + $b] = sFn($a);
+		}
+	};
+
+	var setMonthsAndYears = function (orient, d1, d2, context) {
+		function inc() {
+			d1.addMonths(-orient);
+			context.months++;
+			if (context.months === 12) {
+				context.years++;
+				context.months = 0;
+			}
+		}
+		if (orient === +1) {
+			while (d1 > d2) {
+				inc();
+			}
+		} else {
+			while (d1 < d2) {
+				inc();
+			}
+		}
+		context.months--;
+		context.months *= orient;
+		context.years *= orient;
+	};
+
+	var adjustForDST = function(orient, startDate, endDate) {
+		var hasDSTMismatch = (false === (startDate.isDaylightSavingTime() === endDate.isDaylightSavingTime()));
+		if (hasDSTMismatch && orient === 1) {
+			startDate.addHours(-1);
+		} else if (hasDSTMismatch) {
+			startDate.addHours(1);
+		}
+	};
+	/**
+	 * TimePeriod(startDate, endDate);
+	 * TimePeriod(years, months, days, hours, minutes, seconds, milliseconds);
+	 */
+	var TimePeriod = function (years, months, days, hours, minutes, seconds, milliseconds) {
+		if (arguments.length === 7) {
+			this.set(years, months, days, hours, minutes, seconds, milliseconds);
+		} else if (arguments.length === 2 && arguments[0] instanceof Date && arguments[1] instanceof Date) {
+			var startDate = arguments[0].clone();
+			var endDate = arguments[1].clone();
+			var orient = (startDate > endDate) ? +1 : -1;
+			this.dates = {
+				start: arguments[0].clone(),
+				end: arguments[1].clone()
+			};
+
+			setMonthsAndYears(orient, startDate, endDate, this);
+			adjustForDST(orient, startDate, endDate);
+			// // TODO - adjust for DST
+			var diff = endDate - startDate;
+			if (diff !== 0) {
+				var ts = new TimeSpan(diff);
+				this.set(this.years, this.months, ts.getDays(), ts.getHours(), ts.getMinutes(), ts.getSeconds(), ts.getMilliseconds());
+			}
+		}
+		return this;
+	};
+	// create all the set functions.
+	addSetFuncs(TimePeriod, attrs);
+	TimePeriod.prototype.set = function (years, months, days, hours, minutes, seconds, milliseconds){
+		this.setYears(years || this.getYears());
+		this.setMonths(months || this.getMonths());
+		this.setDays(days || this.getDays());
+		this.setHours(hours || this.getHours());
+		this.setMinutes(minutes || this.getMinutes());
+		this.setSeconds(seconds || this.getSeconds());
+		this.setMilliseconds(milliseconds || this.getMilliseconds());
+	};
+
+	Date.TimePeriod = TimePeriod;
+
+	if (typeof window !== "undefined") {
+		// keeping API compatible for v1.x 
+		window.TimePeriod = TimePeriod;
+	}
+}());
+},{}],14:[function(require,module,exports){
+(function () {
+	"use strict";
+	var gFn = function (attr) {
+		return function () {
+			return this[attr];
+		};
+	};
+	
+	var sFn = function (attr) {
+		return function (val) {
+			this[attr] = val;
+			return this;
+		};
+	};
+	var attrs = ["years", "months", "days", "hours", "minutes", "seconds", "milliseconds"];
+	var addSetFuncs = function (context, attrs) {
+		for (var i = 0; i < attrs.length ; i++) {
+			var $a = attrs[i], $b = $a.slice(0, 1).toUpperCase() + $a.slice(1);
+			context.prototype[$a] = 0;
+			context.prototype["get" + $b] = gFn($a);
+			context.prototype["set" + $b] = sFn($a);
+		}
+	};
+	/**
+	 * new TimeSpan(milliseconds);
+	 * new TimeSpan(days, hours, minutes, seconds);
+	 * new TimeSpan(days, hours, minutes, seconds, milliseconds);
+	 */
+	var TimeSpan = function (days, hours, minutes, seconds, milliseconds) {
+		if (arguments.length === 1 && typeof days === "number") {
+			var orient = (days < 0) ? -1 : +1;
+			var millsLeft = Math.abs(days);
+			this.setDays(Math.floor(millsLeft / 86400000) * orient);
+			millsLeft = millsLeft % 86400000;
+			this.setHours(Math.floor(millsLeft / 3600000) * orient);
+			millsLeft = millsLeft % 3600000;
+			this.setMinutes(Math.floor(millsLeft / 60000) * orient);
+			millsLeft = millsLeft % 60000;
+			this.setSeconds(Math.floor(millsLeft / 1000) * orient);
+			millsLeft = millsLeft % 1000;
+			this.setMilliseconds(millsLeft * orient);
+		} else {
+			this.set(days, hours, minutes, seconds, milliseconds);
+		}
+
+		this.getTotalMilliseconds = function () {
+			return	(this.getDays() * 86400000) +
+					(this.getHours() * 3600000) +
+					(this.getMinutes() * 60000) +
+					(this.getSeconds() * 1000);
+		};
+		
+		this.compareTo = function (time) {
+			var t1 = new Date(1970, 1, 1, this.getHours(), this.getMinutes(), this.getSeconds()), t2;
+			if (time === null) {
+				t2 = new Date(1970, 1, 1, 0, 0, 0);
+			}
+			else {
+				t2 = new Date(1970, 1, 1, time.getHours(), time.getMinutes(), time.getSeconds());
+			}
+			return (t1 < t2) ? -1 : (t1 > t2) ? 1 : 0;
+		};
+
+		this.equals = function (time) {
+			return (this.compareTo(time) === 0);
+		};
+
+		this.add = function (time) {
+			return (time === null) ? this : this.addSeconds(time.getTotalMilliseconds() / 1000);
+		};
+
+		this.subtract = function (time) {
+			return (time === null) ? this : this.addSeconds(-time.getTotalMilliseconds() / 1000);
+		};
+
+		this.addDays = function (n) {
+			return new TimeSpan(this.getTotalMilliseconds() + (n * 86400000));
+		};
+
+		this.addHours = function (n) {
+			return new TimeSpan(this.getTotalMilliseconds() + (n * 3600000));
+		};
+
+		this.addMinutes = function (n) {
+			return new TimeSpan(this.getTotalMilliseconds() + (n * 60000));
+		};
+
+		this.addSeconds = function (n) {
+			return new TimeSpan(this.getTotalMilliseconds() + (n * 1000));
+		};
+
+		this.addMilliseconds = function (n) {
+			return new TimeSpan(this.getTotalMilliseconds() + n);
+		};
+
+		this.get12HourHour = function () {
+			return (this.getHours() > 12) ? this.getHours() - 12 : (this.getHours() === 0) ? 12 : this.getHours();
+		};
+
+		this.getDesignator = function () {
+			return (this.getHours() < 12) ? Date.CultureInfo.amDesignator : Date.CultureInfo.pmDesignator;
+		};
+
+		this.toString = function (format) {
+			this._toString = function () {
+				if (this.getDays() !== null && this.getDays() > 0) {
+					return this.getDays() + "." + this.getHours() + ":" + this.p(this.getMinutes()) + ":" + this.p(this.getSeconds());
+				} else {
+					return this.getHours() + ":" + this.p(this.getMinutes()) + ":" + this.p(this.getSeconds());
+				}
+			};
+			
+			this.p = function (s) {
+				return (s.toString().length < 2) ? "0" + s : s;
+			};
+			
+			var me = this;
+			
+			return format ? format.replace(/dd?|HH?|hh?|mm?|ss?|tt?/g,
+			function (format) {
+				switch (format) {
+				case "d":
+					return me.getDays();
+				case "dd":
+					return me.p(me.getDays());
+				case "H":
+					return me.getHours();
+				case "HH":
+					return me.p(me.getHours());
+				case "h":
+					return me.get12HourHour();
+				case "hh":
+					return me.p(me.get12HourHour());
+				case "m":
+					return me.getMinutes();
+				case "mm":
+					return me.p(me.getMinutes());
+				case "s":
+					return me.getSeconds();
+				case "ss":
+					return me.p(me.getSeconds());
+				case "t":
+					return ((me.getHours() < 12) ? Date.CultureInfo.amDesignator : Date.CultureInfo.pmDesignator).substring(0, 1);
+				case "tt":
+					return (me.getHours() < 12) ? Date.CultureInfo.amDesignator : Date.CultureInfo.pmDesignator;
+				}
+			}
+			) : this._toString();
+		};
+		return this;
+	};
+	addSetFuncs(TimeSpan, attrs.slice(2));
+	TimeSpan.prototype.set = function (days, hours, minutes, seconds, milliseconds){
+		this.setDays(days || this.getDays());
+		this.setHours(hours || this.getHours());
+		this.setMinutes(minutes || this.getMinutes());
+		this.setSeconds(seconds || this.getSeconds());
+		this.setMilliseconds(milliseconds || this.getMilliseconds());
+	};
+
+
+	/**
+	 * Gets the time of day for this date instances. 
+	 * @return {TimeSpan} TimeSpan
+	 */
+	Date.prototype.getTimeOfDay = function () {
+		return new TimeSpan(0, this.getHours(), this.getMinutes(), this.getSeconds(), this.getMilliseconds());
+	};
+
+	Date.TimeSpan = TimeSpan;
+
+	if (typeof window !== "undefined" ) {
+		// keeping API compatible for v1.x 
+		window.TimeSpan = TimeSpan;
+	}
+}());
+},{}],15:[function(require,module,exports){
 // HumanizeDuration.js - https://git.io/j0HgmQ
 
 /* global define, module */
@@ -1297,7 +7509,2143 @@
   }
 })(); // eslint-disable-line semi
 
-},{}],2:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
+/**
+ * jQuery contextMenu v2.9.2 - Plugin for simple contextMenu handling
+ *
+ * Version: v2.9.2
+ *
+ * Authors: Björn Brala (SWIS.nl), Rodney Rehm, Addy Osmani (patches for FF)
+ * Web: http://swisnl.github.io/jQuery-contextMenu/
+ *
+ * Copyright (c) 2011-2020 SWIS BV and contributors
+ *
+ * Licensed under
+ *   MIT License http://www.opensource.org/licenses/mit-license
+ *
+ * Date: 2020-05-13T13:55:36.983Z
+ */
+
+// jscs:disable
+/* jshint ignore:start */
+(function (factory) {
+    if (typeof define === 'function' && define.amd) {
+        // AMD. Register as anonymous module.
+        define(['jquery'], factory);
+    } else if (typeof exports === 'object') {
+        // Node / CommonJS
+        factory(require('jquery'));
+    } else {
+        // Browser globals.
+        factory(jQuery);
+    }
+})(function ($) {
+
+    'use strict';
+
+    // TODO: -
+    // ARIA stuff: menuitem, menuitemcheckbox und menuitemradio
+    // create <menu> structure if $.support[htmlCommand || htmlMenuitem] and !opt.disableNative
+
+    // determine html5 compatibility
+    $.support.htmlMenuitem = ('HTMLMenuItemElement' in window);
+    $.support.htmlCommand = ('HTMLCommandElement' in window);
+    $.support.eventSelectstart = ('onselectstart' in document.documentElement);
+    /* // should the need arise, test for css user-select
+     $.support.cssUserSelect = (function(){
+     var t = false,
+     e = document.createElement('div');
+
+     $.each('Moz|Webkit|Khtml|O|ms|Icab|'.split('|'), function(i, prefix) {
+     var propCC = prefix + (prefix ? 'U' : 'u') + 'serSelect',
+     prop = (prefix ? ('-' + prefix.toLowerCase() + '-') : '') + 'user-select';
+
+     e.style.cssText = prop + ': text;';
+     if (e.style[propCC] == 'text') {
+     t = true;
+     return false;
+     }
+
+     return true;
+     });
+
+     return t;
+     })();
+     */
+
+
+    if (!$.ui || !$.widget) {
+        // duck punch $.cleanData like jQueryUI does to get that remove event
+        $.cleanData = (function (orig) {
+            return function (elems) {
+                var events, elem, i;
+                for (i = 0; elems[i] != null; i++) {
+                    elem = elems[i];
+                    try {
+                        // Only trigger remove when necessary to save time
+                        events = $._data(elem, 'events');
+                        if (events && events.remove) {
+                            $(elem).triggerHandler('remove');
+                        }
+
+                        // Http://bugs.jquery.com/ticket/8235
+                    } catch (e) {
+                    }
+                }
+                orig(elems);
+            };
+        })($.cleanData);
+    }
+    /* jshint ignore:end */
+    // jscs:enable
+
+    var // currently active contextMenu trigger
+        $currentTrigger = null,
+        // is contextMenu initialized with at least one menu?
+        initialized = false,
+        // window handle
+        $win = $(window),
+        // number of registered menus
+        counter = 0,
+        // mapping selector to namespace
+        namespaces = {},
+        // mapping namespace to options
+        menus = {},
+        // custom command type handlers
+        types = {},
+        // default values
+        defaults = {
+            // selector of contextMenu trigger
+            selector: null,
+            // where to append the menu to
+            appendTo: null,
+            // method to trigger context menu ["right", "left", "hover"]
+            trigger: 'right',
+            // hide menu when mouse leaves trigger / menu elements
+            autoHide: false,
+            // ms to wait before showing a hover-triggered context menu
+            delay: 200,
+            // flag denoting if a second trigger should simply move (true) or rebuild (false) an open menu
+            // as long as the trigger happened on one of the trigger-element's child nodes
+            reposition: true,
+            // Flag denoting if a second trigger should close the menu, as long as
+            // the trigger happened on one of the trigger-element's child nodes.
+            // This overrides the reposition option.
+            hideOnSecondTrigger: false,
+
+            //ability to select submenu
+            selectableSubMenu: false,
+
+            // Default classname configuration to be able avoid conflicts in frameworks
+            classNames: {
+                hover: 'context-menu-hover', // Item hover
+                disabled: 'context-menu-disabled', // Item disabled
+                visible: 'context-menu-visible', // Item visible
+                notSelectable: 'context-menu-not-selectable', // Item not selectable
+
+                icon: 'context-menu-icon',
+                iconEdit: 'context-menu-icon-edit',
+                iconCut: 'context-menu-icon-cut',
+                iconCopy: 'context-menu-icon-copy',
+                iconPaste: 'context-menu-icon-paste',
+                iconDelete: 'context-menu-icon-delete',
+                iconAdd: 'context-menu-icon-add',
+                iconQuit: 'context-menu-icon-quit',
+                iconLoadingClass: 'context-menu-icon-loading'
+            },
+
+            // determine position to show menu at
+            determinePosition: function ($menu) {
+                // position to the lower middle of the trigger element
+                if ($.ui && $.ui.position) {
+                    // .position() is provided as a jQuery UI utility
+                    // (...and it won't work on hidden elements)
+                    $menu.css('display', 'block').position({
+                        my: 'center top',
+                        at: 'center bottom',
+                        of: this,
+                        offset: '0 5',
+                        collision: 'fit'
+                    }).css('display', 'none');
+                } else {
+                    // determine contextMenu position
+                    var offset = this.offset();
+                    offset.top += this.outerHeight();
+                    offset.left += this.outerWidth() / 2 - $menu.outerWidth() / 2;
+                    $menu.css(offset);
+                }
+            },
+            // position menu
+            position: function (opt, x, y) {
+                var offset;
+                // determine contextMenu position
+                if (!x && !y) {
+                    opt.determinePosition.call(this, opt.$menu);
+                    return;
+                } else if (x === 'maintain' && y === 'maintain') {
+                    // x and y must not be changed (after re-show on command click)
+                    offset = opt.$menu.position();
+                } else {
+                    // x and y are given (by mouse event)
+                    var offsetParentOffset = opt.$menu.offsetParent().offset();
+                    offset = {top: y - offsetParentOffset.top, left: x -offsetParentOffset.left};
+                }
+
+                // correct offset if viewport demands it
+                var bottom = $win.scrollTop() + $win.height(),
+                    right = $win.scrollLeft() + $win.width(),
+                    height = opt.$menu.outerHeight(),
+                    width = opt.$menu.outerWidth();
+
+                if (offset.top + height > bottom) {
+                    offset.top -= height;
+                }
+
+                if (offset.top < 0) {
+                    offset.top = 0;
+                }
+
+                if (offset.left + width > right) {
+                    offset.left -= width;
+                }
+
+                if (offset.left < 0) {
+                    offset.left = 0;
+                }
+
+                opt.$menu.css(offset);
+            },
+            // position the sub-menu
+            positionSubmenu: function ($menu) {
+                if (typeof $menu === 'undefined') {
+                    // When user hovers over item (which has sub items) handle.focusItem will call this.
+                    // but the submenu does not exist yet if opt.items is a promise. just return, will
+                    // call positionSubmenu after promise is completed.
+                    return;
+                }
+                if ($.ui && $.ui.position) {
+                    // .position() is provided as a jQuery UI utility
+                    // (...and it won't work on hidden elements)
+                    $menu.css('display', 'block').position({
+                        my: 'left top-5',
+                        at: 'right top',
+                        of: this,
+                        collision: 'flipfit fit'
+                    }).css('display', '');
+                } else {
+                    // determine contextMenu position
+                    var offset = {
+                        top: -9,
+                        left: this.outerWidth() - 5
+                    };
+                    $menu.css(offset);
+                }
+            },
+            // offset to add to zIndex
+            zIndex: 1,
+            // show hide animation settings
+            animation: {
+                duration: 50,
+                show: 'slideDown',
+                hide: 'slideUp'
+            },
+            // events
+            events: {
+                preShow: $.noop,
+                show: $.noop,
+                hide: $.noop,
+                activated: $.noop
+            },
+            // default callback
+            callback: null,
+            // list of contextMenu items
+            items: {}
+        },
+        // mouse position for hover activation
+        hoveract = {
+            timer: null,
+            pageX: null,
+            pageY: null
+        },
+        // determine zIndex
+        zindex = function ($t) {
+            var zin = 0,
+                $tt = $t;
+
+            while (true) {
+                zin = Math.max(zin, parseInt($tt.css('z-index'), 10) || 0);
+                $tt = $tt.parent();
+                if (!$tt || !$tt.length || 'html body'.indexOf($tt.prop('nodeName').toLowerCase()) > -1) {
+                    break;
+                }
+            }
+            return zin;
+        },
+        // event handlers
+        handle = {
+            // abort anything
+            abortevent: function (e) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+            },
+            // contextmenu show dispatcher
+            contextmenu: function (e) {
+                var $this = $(this);
+
+                //Show browser context-menu when preShow returns false
+                if (e.data.events.preShow($this,e) === false) {
+                    return;
+                }
+
+                // disable actual context-menu if we are using the right mouse button as the trigger
+                if (e.data.trigger === 'right') {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                }
+
+                // abort native-triggered events unless we're triggering on right click
+                if ((e.data.trigger !== 'right' && e.data.trigger !== 'demand') && e.originalEvent) {
+                    return;
+                }
+
+                // Let the current contextmenu decide if it should show or not based on its own trigger settings
+                if (typeof e.mouseButton !== 'undefined' && e.data) {
+                    if (!(e.data.trigger === 'left' && e.mouseButton === 0) && !(e.data.trigger === 'right' && e.mouseButton === 2)) {
+                        // Mouse click is not valid.
+                        return;
+                    }
+                }
+
+                // abort event if menu is visible for this trigger
+                if ($this.hasClass('context-menu-active')) {
+                    return;
+                }
+
+                if (!$this.hasClass('context-menu-disabled')) {
+                    // theoretically need to fire a show event at <menu>
+                    // http://www.whatwg.org/specs/web-apps/current-work/multipage/interactive-elements.html#context-menus
+                    // var evt = jQuery.Event("show", { data: data, pageX: e.pageX, pageY: e.pageY, relatedTarget: this });
+                    // e.data.$menu.trigger(evt);
+
+                    $currentTrigger = $this;
+                    if (e.data.build) {
+                        var built = e.data.build($currentTrigger, e);
+                        // abort if build() returned false
+                        if (built === false) {
+                            return;
+                        }
+
+                        // dynamically build menu on invocation
+                        e.data = $.extend(true, {}, defaults, e.data, built || {});
+
+                        // abort if there are no items to display
+                        if (!e.data.items || $.isEmptyObject(e.data.items)) {
+                            // Note: jQuery captures and ignores errors from event handlers
+                            if (window.console) {
+                                (console.error || console.log).call(console, 'No items specified to show in contextMenu');
+                            }
+
+                            throw new Error('No Items specified');
+                        }
+
+                        // backreference for custom command type creation
+                        e.data.$trigger = $currentTrigger;
+
+                        op.create(e.data);
+                    }
+                    op.show.call($this, e.data, e.pageX, e.pageY);
+                }
+            },
+            // contextMenu left-click trigger
+            click: function (e) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                $(this).trigger($.Event('contextmenu', {data: e.data, pageX: e.pageX, pageY: e.pageY}));
+            },
+            // contextMenu right-click trigger
+            mousedown: function (e) {
+                // register mouse down
+                var $this = $(this);
+
+                // hide any previous menus
+                if ($currentTrigger && $currentTrigger.length && !$currentTrigger.is($this)) {
+                    $currentTrigger.data('contextMenu').$menu.trigger('contextmenu:hide');
+                }
+
+                // activate on right click
+                if (e.button === 2) {
+                    $currentTrigger = $this.data('contextMenuActive', true);
+                }
+            },
+            // contextMenu right-click trigger
+            mouseup: function (e) {
+                // show menu
+                var $this = $(this);
+                if ($this.data('contextMenuActive') && $currentTrigger && $currentTrigger.length && $currentTrigger.is($this) && !$this.hasClass('context-menu-disabled')) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    $currentTrigger = $this;
+                    $this.trigger($.Event('contextmenu', {data: e.data, pageX: e.pageX, pageY: e.pageY}));
+                }
+
+                $this.removeData('contextMenuActive');
+            },
+            // contextMenu hover trigger
+            mouseenter: function (e) {
+                var $this = $(this),
+                    $related = $(e.relatedTarget),
+                    $document = $(document);
+
+                // abort if we're coming from a menu
+                if ($related.is('.context-menu-list') || $related.closest('.context-menu-list').length) {
+                    return;
+                }
+
+                // abort if a menu is shown
+                if ($currentTrigger && $currentTrigger.length) {
+                    return;
+                }
+
+                hoveract.pageX = e.pageX;
+                hoveract.pageY = e.pageY;
+                hoveract.data = e.data;
+                $document.on('mousemove.contextMenuShow', handle.mousemove);
+                hoveract.timer = setTimeout(function () {
+                    hoveract.timer = null;
+                    $document.off('mousemove.contextMenuShow');
+                    $currentTrigger = $this;
+                    $this.trigger($.Event('contextmenu', {
+                        data: hoveract.data,
+                        pageX: hoveract.pageX,
+                        pageY: hoveract.pageY
+                    }));
+                }, e.data.delay);
+            },
+            // contextMenu hover trigger
+            mousemove: function (e) {
+                hoveract.pageX = e.pageX;
+                hoveract.pageY = e.pageY;
+            },
+            // contextMenu hover trigger
+            mouseleave: function (e) {
+                // abort if we're leaving for a menu
+                var $related = $(e.relatedTarget);
+                if ($related.is('.context-menu-list') || $related.closest('.context-menu-list').length) {
+                    return;
+                }
+
+                try {
+                    clearTimeout(hoveract.timer);
+                } catch (e) {
+                }
+
+                hoveract.timer = null;
+            },
+            // click on layer to hide contextMenu
+            layerClick: function (e) {
+                var $this = $(this),
+                    root = $this.data('contextMenuRoot'),
+                    button = e.button,
+                    x = e.pageX,
+                    y = e.pageY,
+                    fakeClick = x === undefined,
+                    target,
+                    offset;
+
+                e.preventDefault();
+
+                setTimeout(function () {
+                    // If the click is not real, things break: https://github.com/swisnl/jQuery-contextMenu/issues/132
+                    if(fakeClick){
+                        if (root !== null && typeof root !== 'undefined' && root.$menu !== null  && typeof root.$menu !== 'undefined') {
+                            root.$menu.trigger('contextmenu:hide');
+                        }
+                        return;
+                    }
+
+                    var $window;
+                    var triggerAction = ((root.trigger === 'left' && button === 0) || (root.trigger === 'right' && button === 2));
+
+                    // find the element that would've been clicked, wasn't the layer in the way
+                    if (document.elementFromPoint && root.$layer) {
+                        root.$layer.hide();
+                        target = document.elementFromPoint(x - $win.scrollLeft(), y - $win.scrollTop());
+
+                        // also need to try and focus this element if we're in a contenteditable area,
+                        // as the layer will prevent the browser mouse action we want
+                        if (target !== null && target.isContentEditable) {
+                            var range = document.createRange(),
+                                sel = window.getSelection();
+                            range.selectNode(target);
+                            range.collapse(true);
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                        }
+                        $(target).trigger(e);
+                        root.$layer.show();
+                    }
+
+                    if (root.hideOnSecondTrigger && triggerAction && root.$menu !== null && typeof root.$menu !== 'undefined') {
+                      root.$menu.trigger('contextmenu:hide');
+                      return;
+                    }
+
+                    if (root.reposition && triggerAction) {
+                        if (document.elementFromPoint) {
+                            if (root.$trigger.is(target)) {
+                                root.position.call(root.$trigger, root, x, y);
+                                return;
+                            }
+                        } else {
+                            offset = root.$trigger.offset();
+                            $window = $(window);
+                            // while this looks kinda awful, it's the best way to avoid
+                            // unnecessarily calculating any positions
+                            offset.top += $window.scrollTop();
+                            if (offset.top <= e.pageY) {
+                                offset.left += $window.scrollLeft();
+                                if (offset.left <= e.pageX) {
+                                    offset.bottom = offset.top + root.$trigger.outerHeight();
+                                    if (offset.bottom >= e.pageY) {
+                                        offset.right = offset.left + root.$trigger.outerWidth();
+                                        if (offset.right >= e.pageX) {
+                                            // reposition
+                                            root.position.call(root.$trigger, root, x, y);
+                                            return;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (target && triggerAction) {
+                        root.$trigger.one('contextmenu:hidden', function () {
+                            $(target).contextMenu({x: x, y: y, button: button});
+                        });
+                    }
+
+                    if (root !== null && typeof root !== 'undefined' && root.$menu !== null  && typeof root.$menu !== 'undefined') {
+                        root.$menu.trigger('contextmenu:hide');
+                    }
+                }, 50);
+            },
+            // key handled :hover
+            keyStop: function (e, opt) {
+                if (!opt.isInput) {
+                    e.preventDefault();
+                }
+
+                e.stopPropagation();
+            },
+            key: function (e) {
+
+                var opt = {};
+
+                // Only get the data from $currentTrigger if it exists
+                if ($currentTrigger) {
+                    opt = $currentTrigger.data('contextMenu') || {};
+                }
+                // If the trigger happen on a element that are above the contextmenu do this
+                if (typeof opt.zIndex === 'undefined') {
+                    opt.zIndex = 0;
+                }
+                var targetZIndex = 0;
+                var getZIndexOfTriggerTarget = function (target) {
+                    if (target.style.zIndex !== '') {
+                        targetZIndex = target.style.zIndex;
+                    } else {
+                        if (target.offsetParent !== null && typeof target.offsetParent !== 'undefined') {
+                            getZIndexOfTriggerTarget(target.offsetParent);
+                        }
+                        else if (target.parentElement !== null && typeof target.parentElement !== 'undefined') {
+                            getZIndexOfTriggerTarget(target.parentElement);
+                        }
+                    }
+                };
+                getZIndexOfTriggerTarget(e.target);
+                // If targetZIndex is heigher then opt.zIndex dont progress any futher.
+                // This is used to make sure that if you are using a dialog with a input / textarea / contenteditable div
+                // and its above the contextmenu it wont steal keys events
+                if (opt.$menu && parseInt(targetZIndex,10) > parseInt(opt.$menu.css("zIndex"),10)) {
+                    return;
+                }
+                switch (e.keyCode) {
+                    case 9:
+                    case 38: // up
+                        handle.keyStop(e, opt);
+                        // if keyCode is [38 (up)] or [9 (tab) with shift]
+                        if (opt.isInput) {
+                            if (e.keyCode === 9 && e.shiftKey) {
+                                e.preventDefault();
+                                if (opt.$selected) {
+                                    opt.$selected.find('input, textarea, select').blur();
+                                }
+                                if (opt.$menu !== null && typeof opt.$menu !== 'undefined') {
+                                    opt.$menu.trigger('prevcommand');
+                                }
+                                return;
+                            } else if (e.keyCode === 38 && opt.$selected.find('input, textarea, select').prop('type') === 'checkbox') {
+                                // checkboxes don't capture this key
+                                e.preventDefault();
+                                return;
+                            }
+                        } else if (e.keyCode !== 9 || e.shiftKey) {
+                            if (opt.$menu !== null && typeof opt.$menu !== 'undefined') {
+                                opt.$menu.trigger('prevcommand');
+                            }
+                            return;
+                        }
+                        break;
+                    // omitting break;
+                    // case 9: // tab - reached through omitted break;
+                    case 40: // down
+                        handle.keyStop(e, opt);
+                        if (opt.isInput) {
+                            if (e.keyCode === 9) {
+                                e.preventDefault();
+                                if (opt.$selected) {
+                                    opt.$selected.find('input, textarea, select').blur();
+                                }
+                                if (opt.$menu !== null && typeof opt.$menu !== 'undefined') {
+                                    opt.$menu.trigger('nextcommand');
+                                }
+                                return;
+                            } else if (e.keyCode === 40 && opt.$selected.find('input, textarea, select').prop('type') === 'checkbox') {
+                                // checkboxes don't capture this key
+                                e.preventDefault();
+                                return;
+                            }
+                        } else {
+                            if (opt.$menu !== null && typeof opt.$menu !== 'undefined') {
+                                opt.$menu.trigger('nextcommand');
+                            }
+                            return;
+                        }
+                        break;
+
+                    case 37: // left
+                        handle.keyStop(e, opt);
+                        if (opt.isInput || !opt.$selected || !opt.$selected.length) {
+                            break;
+                        }
+
+                        if (!opt.$selected.parent().hasClass('context-menu-root')) {
+                            var $parent = opt.$selected.parent().parent();
+                            opt.$selected.trigger('contextmenu:blur');
+                            opt.$selected = $parent;
+                            return;
+                        }
+                        break;
+
+                    case 39: // right
+                        handle.keyStop(e, opt);
+                        if (opt.isInput || !opt.$selected || !opt.$selected.length) {
+                            break;
+                        }
+
+                        var itemdata = opt.$selected.data('contextMenu') || {};
+                        if (itemdata.$menu && opt.$selected.hasClass('context-menu-submenu')) {
+                            opt.$selected = null;
+                            itemdata.$selected = null;
+                            itemdata.$menu.trigger('nextcommand');
+                            return;
+                        }
+                        break;
+
+                    case 35: // end
+                    case 36: // home
+                        if (opt.$selected && opt.$selected.find('input, textarea, select').length) {
+                            return;
+                        } else {
+                            (opt.$selected && opt.$selected.parent() || opt.$menu)
+                                .children(':not(.' + opt.classNames.disabled + ', .' + opt.classNames.notSelectable + ')')[e.keyCode === 36 ? 'first' : 'last']()
+                                .trigger('contextmenu:focus');
+                            e.preventDefault();
+                            return;
+                        }
+                        break;
+
+                    case 13: // enter
+                        handle.keyStop(e, opt);
+                        if (opt.isInput) {
+                            if (opt.$selected && !opt.$selected.is('textarea, select')) {
+                                e.preventDefault();
+                                return;
+                            }
+                            break;
+                        }
+                        if (typeof opt.$selected !== 'undefined' && opt.$selected !== null) {
+                            opt.$selected.trigger('mouseup');
+                        }
+                        return;
+
+                    case 32: // space
+                    case 33: // page up
+                    case 34: // page down
+                        // prevent browser from scrolling down while menu is visible
+                        handle.keyStop(e, opt);
+                        return;
+
+                    case 27: // esc
+                        handle.keyStop(e, opt);
+                        if (opt.$menu !== null && typeof opt.$menu !== 'undefined') {
+                            opt.$menu.trigger('contextmenu:hide');
+                        }
+                        return;
+
+                    default: // 0-9, a-z
+                        var k = (String.fromCharCode(e.keyCode)).toUpperCase();
+                        if (opt.accesskeys && opt.accesskeys[k]) {
+                            // according to the specs accesskeys must be invoked immediately
+                            opt.accesskeys[k].$node.trigger(opt.accesskeys[k].$menu ? 'contextmenu:focus' : 'mouseup');
+                            return;
+                        }
+                        break;
+                }
+                // pass event to selected item,
+                // stop propagation to avoid endless recursion
+                e.stopPropagation();
+                if (typeof opt.$selected !== 'undefined' && opt.$selected !== null) {
+                    opt.$selected.trigger(e);
+                }
+            },
+            // select previous possible command in menu
+            prevItem: function (e) {
+                e.stopPropagation();
+                var opt = $(this).data('contextMenu') || {};
+                var root = $(this).data('contextMenuRoot') || {};
+
+                // obtain currently selected menu
+                if (opt.$selected) {
+                    var $s = opt.$selected;
+                    opt = opt.$selected.parent().data('contextMenu') || {};
+                    opt.$selected = $s;
+                }
+
+                var $children = opt.$menu.children(),
+                    $prev = !opt.$selected || !opt.$selected.prev().length ? $children.last() : opt.$selected.prev(),
+                    $round = $prev;
+
+                // skip disabled or hidden elements
+                while ($prev.hasClass(root.classNames.disabled) || $prev.hasClass(root.classNames.notSelectable) || $prev.is(':hidden')) {
+                    if ($prev.prev().length) {
+                        $prev = $prev.prev();
+                    } else {
+                        $prev = $children.last();
+                    }
+                    if ($prev.is($round)) {
+                        // break endless loop
+                        return;
+                    }
+                }
+
+                // leave current
+                if (opt.$selected) {
+                    handle.itemMouseleave.call(opt.$selected.get(0), e);
+                }
+
+                // activate next
+                handle.itemMouseenter.call($prev.get(0), e);
+
+                // focus input
+                var $input = $prev.find('input, textarea, select');
+                if ($input.length) {
+                    $input.focus();
+                }
+            },
+            // select next possible command in menu
+            nextItem: function (e) {
+                e.stopPropagation();
+                var opt = $(this).data('contextMenu') || {};
+                var root = $(this).data('contextMenuRoot') || {};
+
+                // obtain currently selected menu
+                if (opt.$selected) {
+                    var $s = opt.$selected;
+                    opt = opt.$selected.parent().data('contextMenu') || {};
+                    opt.$selected = $s;
+                }
+
+                var $children = opt.$menu.children(),
+                    $next = !opt.$selected || !opt.$selected.next().length ? $children.first() : opt.$selected.next(),
+                    $round = $next;
+
+                // skip disabled
+                while ($next.hasClass(root.classNames.disabled) || $next.hasClass(root.classNames.notSelectable) || $next.is(':hidden')) {
+                    if ($next.next().length) {
+                        $next = $next.next();
+                    } else {
+                        $next = $children.first();
+                    }
+                    if ($next.is($round)) {
+                        // break endless loop
+                        return;
+                    }
+                }
+
+                // leave current
+                if (opt.$selected) {
+                    handle.itemMouseleave.call(opt.$selected.get(0), e);
+                }
+
+                // activate next
+                handle.itemMouseenter.call($next.get(0), e);
+
+                // focus input
+                var $input = $next.find('input, textarea, select');
+                if ($input.length) {
+                    $input.focus();
+                }
+            },
+            // flag that we're inside an input so the key handler can act accordingly
+            focusInput: function () {
+                var $this = $(this).closest('.context-menu-item'),
+                    data = $this.data(),
+                    opt = data.contextMenu,
+                    root = data.contextMenuRoot;
+
+                root.$selected = opt.$selected = $this;
+                root.isInput = opt.isInput = true;
+            },
+            // flag that we're inside an input so the key handler can act accordingly
+            blurInput: function () {
+                var $this = $(this).closest('.context-menu-item'),
+                    data = $this.data(),
+                    opt = data.contextMenu,
+                    root = data.contextMenuRoot;
+
+                root.isInput = opt.isInput = false;
+            },
+            // :hover on menu
+            menuMouseenter: function () {
+                var root = $(this).data().contextMenuRoot;
+                root.hovering = true;
+            },
+            // :hover on menu
+            menuMouseleave: function (e) {
+                var root = $(this).data().contextMenuRoot;
+                if (root.$layer && root.$layer.is(e.relatedTarget)) {
+                    root.hovering = false;
+                }
+            },
+            // :hover done manually so key handling is possible
+            itemMouseenter: function (e) {
+                var $this = $(this),
+                    data = $this.data(),
+                    opt = data.contextMenu,
+                    root = data.contextMenuRoot;
+
+                root.hovering = true;
+
+                // abort if we're re-entering
+                if (e && root.$layer && root.$layer.is(e.relatedTarget)) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                }
+
+                // make sure only one item is selected
+                (opt.$menu ? opt : root).$menu
+                    .children('.' + root.classNames.hover).trigger('contextmenu:blur')
+                    .children('.hover').trigger('contextmenu:blur');
+
+                if ($this.hasClass(root.classNames.disabled) || $this.hasClass(root.classNames.notSelectable)) {
+                    opt.$selected = null;
+                    return;
+                }
+
+
+                $this.trigger('contextmenu:focus');
+            },
+            // :hover done manually so key handling is possible
+            itemMouseleave: function (e) {
+                var $this = $(this),
+                    data = $this.data(),
+                    opt = data.contextMenu,
+                    root = data.contextMenuRoot;
+
+                if (root !== opt && root.$layer && root.$layer.is(e.relatedTarget)) {
+                    if (typeof root.$selected !== 'undefined' && root.$selected !== null) {
+                        root.$selected.trigger('contextmenu:blur');
+                    }
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    root.$selected = opt.$selected = opt.$node;
+                    return;
+                }
+
+                if(opt && opt.$menu && opt.$menu.hasClass('context-menu-visible')){
+                    return;
+                }
+
+                $this.trigger('contextmenu:blur');
+            },
+            // contextMenu item click
+            itemClick: function (e) {
+                var $this = $(this),
+                    data = $this.data(),
+                    opt = data.contextMenu,
+                    root = data.contextMenuRoot,
+                    key = data.contextMenuKey,
+                    callback;
+
+                // abort if the key is unknown or disabled or is a menu
+                if (!opt.items[key] || $this.is('.' + root.classNames.disabled + ', .context-menu-separator, .' + root.classNames.notSelectable) || ($this.is('.context-menu-submenu') && root.selectableSubMenu === false )) {
+                    return;
+                }
+
+                e.preventDefault();
+                e.stopImmediatePropagation();
+
+                if ($.isFunction(opt.callbacks[key]) && Object.prototype.hasOwnProperty.call(opt.callbacks, key)) {
+                    // item-specific callback
+                    callback = opt.callbacks[key];
+                } else if ($.isFunction(root.callback)) {
+                    // default callback
+                    callback = root.callback;
+                } else {
+                    // no callback, no action
+                    return;
+                }
+
+                // hide menu if callback doesn't stop that
+                if (callback.call(root.$trigger, key, root, e) !== false) {
+                    root.$menu.trigger('contextmenu:hide');
+                } else if (root.$menu.parent().length) {
+                    op.update.call(root.$trigger, root);
+                }
+            },
+            // ignore click events on input elements
+            inputClick: function (e) {
+                e.stopImmediatePropagation();
+            },
+            // hide <menu>
+            hideMenu: function (e, data) {
+                var root = $(this).data('contextMenuRoot');
+                op.hide.call(root.$trigger, root, data && data.force);
+            },
+            // focus <command>
+            focusItem: function (e) {
+                e.stopPropagation();
+                var $this = $(this),
+                    data = $this.data(),
+                    opt = data.contextMenu,
+                    root = data.contextMenuRoot;
+
+                if ($this.hasClass(root.classNames.disabled) || $this.hasClass(root.classNames.notSelectable)) {
+                    return;
+                }
+
+                $this
+                    .addClass([root.classNames.hover, root.classNames.visible].join(' '))
+                    // select other items and included items
+                    .parent().find('.context-menu-item').not($this)
+                    .removeClass(root.classNames.visible)
+                    .filter('.' + root.classNames.hover)
+                    .trigger('contextmenu:blur');
+
+                // remember selected
+                opt.$selected = root.$selected = $this;
+
+
+                if(opt && opt.$node && opt.$node.hasClass('context-menu-submenu')){
+                    opt.$node.addClass(root.classNames.hover);
+                }
+
+                // position sub-menu - do after show so dumb $.ui.position can keep up
+                if (opt.$node) {
+                    root.positionSubmenu.call(opt.$node, opt.$menu);
+                }
+            },
+            // blur <command>
+            blurItem: function (e) {
+                e.stopPropagation();
+                var $this = $(this),
+                    data = $this.data(),
+                    opt = data.contextMenu,
+                    root = data.contextMenuRoot;
+
+                if (opt.autoHide) { // for tablets and touch screens this needs to remain
+                    $this.removeClass(root.classNames.visible);
+                }
+                $this.removeClass(root.classNames.hover);
+                opt.$selected = null;
+            }
+        },
+        // operations
+        op = {
+            show: function (opt, x, y) {
+                var $trigger = $(this),
+                    css = {};
+
+                // hide any open menus
+                $('#context-menu-layer').trigger('mousedown');
+
+                // backreference for callbacks
+                opt.$trigger = $trigger;
+
+                // show event
+                if (opt.events.show.call($trigger, opt) === false) {
+                    $currentTrigger = null;
+                    return;
+                }
+
+                // create or update context menu
+                var hasVisibleItems = op.update.call($trigger, opt);
+                if (hasVisibleItems === false) {
+                    $currentTrigger = null;
+                    return;
+                }
+
+                // position menu
+                opt.position.call($trigger, opt, x, y);
+
+                // make sure we're in front
+                if (opt.zIndex) {
+                    var additionalZValue = opt.zIndex;
+                    // If opt.zIndex is a function, call the function to get the right zIndex.
+                    if (typeof opt.zIndex === 'function') {
+                        additionalZValue = opt.zIndex.call($trigger, opt);
+                    }
+                    css.zIndex = zindex($trigger) + additionalZValue;
+                }
+
+                // add layer
+                op.layer.call(opt.$menu, opt, css.zIndex);
+
+                // adjust sub-menu zIndexes
+                opt.$menu.find('ul').css('zIndex', css.zIndex + 1);
+
+                // position and show context menu
+                opt.$menu.css(css)[opt.animation.show](opt.animation.duration, function () {
+                    $trigger.trigger('contextmenu:visible');
+
+                    op.activated(opt);
+                    opt.events.activated(opt);
+                });
+                // make options available and set state
+                $trigger
+                    .data('contextMenu', opt)
+                    .addClass('context-menu-active');
+
+                // register key handler
+                $(document).off('keydown.contextMenu').on('keydown.contextMenu', handle.key);
+                // register autoHide handler
+                if (opt.autoHide) {
+                    // mouse position handler
+                    $(document).on('mousemove.contextMenuAutoHide', function (e) {
+                        // need to capture the offset on mousemove,
+                        // since the page might've been scrolled since activation
+                        var pos = $trigger.offset();
+                        pos.right = pos.left + $trigger.outerWidth();
+                        pos.bottom = pos.top + $trigger.outerHeight();
+
+                        if (opt.$layer && !opt.hovering && (!(e.pageX >= pos.left && e.pageX <= pos.right) || !(e.pageY >= pos.top && e.pageY <= pos.bottom))) {
+                            /* Additional hover check after short time, you might just miss the edge of the menu */
+                            setTimeout(function () {
+                                if (!opt.hovering && opt.$menu !== null && typeof opt.$menu !== 'undefined') {
+                                    opt.$menu.trigger('contextmenu:hide');
+                                }
+                            }, 50);
+                        }
+                    });
+                }
+            },
+            hide: function (opt, force) {
+                var $trigger = $(this);
+                if (!opt) {
+                    opt = $trigger.data('contextMenu') || {};
+                }
+
+                // hide event
+                if (!force && opt.events && opt.events.hide.call($trigger, opt) === false) {
+                    return;
+                }
+
+                // remove options and revert state
+                $trigger
+                    .removeData('contextMenu')
+                    .removeClass('context-menu-active');
+
+                if (opt.$layer) {
+                    // keep layer for a bit so the contextmenu event can be aborted properly by opera
+                    setTimeout((function ($layer) {
+                        return function () {
+                            $layer.remove();
+                        };
+                    })(opt.$layer), 10);
+
+                    try {
+                        delete opt.$layer;
+                    } catch (e) {
+                        opt.$layer = null;
+                    }
+                }
+
+                // remove handle
+                $currentTrigger = null;
+                // remove selected
+                opt.$menu.find('.' + opt.classNames.hover).trigger('contextmenu:blur');
+                opt.$selected = null;
+                // collapse all submenus
+                opt.$menu.find('.' + opt.classNames.visible).removeClass(opt.classNames.visible);
+                // unregister key and mouse handlers
+                // $(document).off('.contextMenuAutoHide keydown.contextMenu'); // http://bugs.jquery.com/ticket/10705
+                $(document).off('.contextMenuAutoHide').off('keydown.contextMenu');
+                // hide menu
+                if (opt.$menu) {
+                    opt.$menu[opt.animation.hide](opt.animation.duration, function () {
+                        // tear down dynamically built menu after animation is completed.
+                        if (opt.build) {
+                            opt.$menu.remove();
+                            $.each(opt, function (key) {
+                                switch (key) {
+                                    case 'ns':
+                                    case 'selector':
+                                    case 'build':
+                                    case 'trigger':
+                                        return true;
+
+                                    default:
+                                        opt[key] = undefined;
+                                        try {
+                                            delete opt[key];
+                                        } catch (e) {
+                                        }
+                                        return true;
+                                }
+                            });
+                        }
+
+                        setTimeout(function () {
+                            $trigger.trigger('contextmenu:hidden');
+                        }, 10);
+                    });
+                }
+            },
+            create: function (opt, root) {
+                if (typeof root === 'undefined') {
+                    root = opt;
+                }
+
+                // create contextMenu
+                opt.$menu = $('<ul class="context-menu-list"></ul>').addClass(opt.className || '').data({
+                    'contextMenu': opt,
+                    'contextMenuRoot': root
+                });
+                if(opt.dataAttr){
+                    $.each(opt.dataAttr, function (key, item) {
+                        opt.$menu.attr('data-' + opt.key, item);
+                    });
+                }
+
+                $.each(['callbacks', 'commands', 'inputs'], function (i, k) {
+                    opt[k] = {};
+                    if (!root[k]) {
+                        root[k] = {};
+                    }
+                });
+
+                if (!root.accesskeys) {
+                    root.accesskeys = {};
+                }
+
+                function createNameNode(item) {
+                    var $name = $('<span></span>');
+                    if (item._accesskey) {
+                        if (item._beforeAccesskey) {
+                            $name.append(document.createTextNode(item._beforeAccesskey));
+                        }
+                        $('<span></span>')
+                            .addClass('context-menu-accesskey')
+                            .text(item._accesskey)
+                            .appendTo($name);
+                        if (item._afterAccesskey) {
+                            $name.append(document.createTextNode(item._afterAccesskey));
+                        }
+                    } else {
+                        if (item.isHtmlName) {
+                            // restrict use with access keys
+                            if (typeof item.accesskey !== 'undefined') {
+                                throw new Error('accesskeys are not compatible with HTML names and cannot be used together in the same item');
+                            }
+                            $name.html(item.name);
+                        } else {
+                            $name.text(item.name);
+                        }
+                    }
+                    return $name;
+                }
+
+                // create contextMenu items
+                $.each(opt.items, function (key, item) {
+                    var $t = $('<li class="context-menu-item"></li>').addClass(item.className || ''),
+                        $label = null,
+                        $input = null;
+
+                    // iOS needs to see a click-event bound to an element to actually
+                    // have the TouchEvents infrastructure trigger the click event
+                    $t.on('click', $.noop);
+
+                    // Make old school string seperator a real item so checks wont be
+                    // akward later.
+                    // And normalize 'cm_separator' into 'cm_seperator'.
+                    if (typeof item === 'string' || item.type === 'cm_separator') {
+                        item = {type: 'cm_seperator'};
+                    }
+
+                    item.$node = $t.data({
+                        'contextMenu': opt,
+                        'contextMenuRoot': root,
+                        'contextMenuKey': key
+                    });
+
+                    // register accesskey
+                    // NOTE: the accesskey attribute should be applicable to any element, but Safari5 and Chrome13 still can't do that
+                    if (typeof item.accesskey !== 'undefined') {
+                        var aks = splitAccesskey(item.accesskey);
+                        for (var i = 0, ak; ak = aks[i]; i++) {
+                            if (!root.accesskeys[ak]) {
+                                root.accesskeys[ak] = item;
+                                var matched = item.name.match(new RegExp('^(.*?)(' + ak + ')(.*)$', 'i'));
+                                if (matched) {
+                                    item._beforeAccesskey = matched[1];
+                                    item._accesskey = matched[2];
+                                    item._afterAccesskey = matched[3];
+                                }
+                                break;
+                            }
+                        }
+                    }
+
+                    if (item.type && types[item.type]) {
+                        // run custom type handler
+                        types[item.type].call($t, item, opt, root);
+                        // register commands
+                        $.each([opt, root], function (i, k) {
+                            k.commands[key] = item;
+                            // Overwrite only if undefined or the item is appended to the root. This so it
+                            // doesn't overwrite callbacks of root elements if the name is the same.
+                            if ($.isFunction(item.callback) && (typeof k.callbacks[key] === 'undefined' || typeof opt.type === 'undefined')) {
+                                k.callbacks[key] = item.callback;
+                            }
+                        });
+                    } else {
+                        // add label for input
+                        if (item.type === 'cm_seperator') {
+                            $t.addClass('context-menu-separator ' + root.classNames.notSelectable);
+                        } else if (item.type === 'html') {
+                            $t.addClass('context-menu-html ' + root.classNames.notSelectable);
+                        } else if (item.type !== 'sub' && item.type) {
+                            $label = $('<label></label>').appendTo($t);
+                            createNameNode(item).appendTo($label);
+
+                            $t.addClass('context-menu-input');
+                            opt.hasTypes = true;
+                            $.each([opt, root], function (i, k) {
+                                k.commands[key] = item;
+                                k.inputs[key] = item;
+                            });
+                        } else if (item.items) {
+                            item.type = 'sub';
+                        }
+
+                        switch (item.type) {
+                            case 'cm_seperator':
+                                break;
+
+                            case 'text':
+                                $input = $('<input type="text" value="1" name="" />')
+                                    .attr('name', 'context-menu-input-' + key)
+                                    .val(item.value || '')
+                                    .appendTo($label);
+                                break;
+
+                            case 'textarea':
+                                $input = $('<textarea name=""></textarea>')
+                                    .attr('name', 'context-menu-input-' + key)
+                                    .val(item.value || '')
+                                    .appendTo($label);
+
+                                if (item.height) {
+                                    $input.height(item.height);
+                                }
+                                break;
+
+                            case 'checkbox':
+                                $input = $('<input type="checkbox" value="1" name="" />')
+                                    .attr('name', 'context-menu-input-' + key)
+                                    .val(item.value || '')
+                                    .prop('checked', !!item.selected)
+                                    .prependTo($label);
+                                break;
+
+                            case 'radio':
+                                $input = $('<input type="radio" value="1" name="" />')
+                                    .attr('name', 'context-menu-input-' + item.radio)
+                                    .val(item.value || '')
+                                    .prop('checked', !!item.selected)
+                                    .prependTo($label);
+                                break;
+
+                            case 'select':
+                                $input = $('<select name=""></select>')
+                                    .attr('name', 'context-menu-input-' + key)
+                                    .appendTo($label);
+                                if (item.options) {
+                                    $.each(item.options, function (value, text) {
+                                        $('<option></option>').val(value).text(text).appendTo($input);
+                                    });
+                                    $input.val(item.selected);
+                                }
+                                break;
+
+                            case 'sub':
+                                createNameNode(item).appendTo($t);
+                                item.appendTo = item.$node;
+                                $t.data('contextMenu', item).addClass('context-menu-submenu');
+                                item.callback = null;
+
+                                // If item contains items, and this is a promise, we should create it later
+                                // check if subitems is of type promise. If it is a promise we need to create
+                                // it later, after promise has been resolved.
+                                if ('function' === typeof item.items.then) {
+                                    // probably a promise, process it, when completed it will create the sub menu's.
+                                    op.processPromises(item, root, item.items);
+                                } else {
+                                    // normal submenu.
+                                    op.create(item, root);
+                                }
+                                break;
+
+                            case 'html':
+                                $(item.html).appendTo($t);
+                                break;
+
+                            default:
+                                $.each([opt, root], function (i, k) {
+                                    k.commands[key] = item;
+                                    // Overwrite only if undefined or the item is appended to the root. This so it
+                                    // doesn't overwrite callbacks of root elements if the name is the same.
+                                    if ($.isFunction(item.callback) && (typeof k.callbacks[key] === 'undefined' || typeof opt.type === 'undefined')) {
+                                        k.callbacks[key] = item.callback;
+                                    }
+                                });
+                                createNameNode(item).appendTo($t);
+                                break;
+                        }
+
+                        // disable key listener in <input>
+                        if (item.type && item.type !== 'sub' && item.type !== 'html' && item.type !== 'cm_seperator') {
+                            $input
+                                .on('focus', handle.focusInput)
+                                .on('blur', handle.blurInput);
+
+                            if (item.events) {
+                                $input.on(item.events, opt);
+                            }
+                        }
+
+                        // add icons
+                        if (item.icon) {
+                            if ($.isFunction(item.icon)) {
+                                item._icon = item.icon.call(this, this, $t, key, item);
+                            } else {
+                                if (typeof(item.icon) === 'string' && (
+                                    item.icon.substring(0, 4) === 'fab '
+                                    || item.icon.substring(0, 4) === 'fas '
+                                    || item.icon.substring(0, 4) === 'fad '
+                                    || item.icon.substring(0, 4) === 'far '
+                                    || item.icon.substring(0, 4) === 'fal ')
+                                ) {
+                                    // to enable font awesome
+                                    $t.addClass(root.classNames.icon + ' ' + root.classNames.icon + '--fa5');
+                                    item._icon = $('<i class="' + item.icon + '"></i>');
+                                } else if (typeof(item.icon) === 'string' && item.icon.substring(0, 3) === 'fa-') {
+                                    item._icon = root.classNames.icon + ' ' + root.classNames.icon + '--fa fa ' + item.icon;
+                                } else {
+                                    item._icon = root.classNames.icon + ' ' + root.classNames.icon + '-' + item.icon;
+                                }
+                            }
+
+                            if(typeof(item._icon) === "string"){
+                                $t.addClass(item._icon);
+                            } else {
+                                $t.prepend(item._icon);
+                            }
+                        }
+                    }
+
+                    // cache contained elements
+                    item.$input = $input;
+                    item.$label = $label;
+
+                    // attach item to menu
+                    $t.appendTo(opt.$menu);
+
+                    // Disable text selection
+                    if (!opt.hasTypes && $.support.eventSelectstart) {
+                        // browsers support user-select: none,
+                        // IE has a special event for text-selection
+                        // browsers supporting neither will not be preventing text-selection
+                        $t.on('selectstart.disableTextSelect', handle.abortevent);
+                    }
+                });
+                // attach contextMenu to <body> (to bypass any possible overflow:hidden issues on parents of the trigger element)
+                if (!opt.$node) {
+                    opt.$menu.css('display', 'none').addClass('context-menu-root');
+                }
+                opt.$menu.appendTo(opt.appendTo || document.body);
+            },
+            resize: function ($menu, nested) {
+                var domMenu;
+                // determine widths of submenus, as CSS won't grow them automatically
+                // position:absolute within position:absolute; min-width:100; max-width:200; results in width: 100;
+                // kinda sucks hard...
+
+                // determine width of absolutely positioned element
+                $menu.css({position: 'absolute', display: 'block'});
+                // don't apply yet, because that would break nested elements' widths
+                $menu.data('width',
+                    (domMenu = $menu.get(0)).getBoundingClientRect ?
+                        Math.ceil(domMenu.getBoundingClientRect().width) :
+                        $menu.outerWidth() + 1); // outerWidth() returns rounded pixels
+                // reset styles so they allow nested elements to grow/shrink naturally
+                $menu.css({
+                    position: 'static',
+                    minWidth: '0px',
+                    maxWidth: '100000px'
+                });
+                // identify width of nested menus
+                $menu.find('> li > ul').each(function () {
+                    op.resize($(this), true);
+                });
+                // reset and apply changes in the end because nested
+                // elements' widths wouldn't be calculatable otherwise
+                if (!nested) {
+                    $menu.find('ul').addBack().css({
+                        position: '',
+                        display: '',
+                        minWidth: '',
+                        maxWidth: ''
+                    }).outerWidth(function () {
+                        return $(this).data('width');
+                    });
+                }
+            },
+            update: function (opt, root) {
+                var $trigger = this;
+                if (typeof root === 'undefined') {
+                    root = opt;
+                    op.resize(opt.$menu);
+                }
+
+                var hasVisibleItems = false;
+
+                // re-check disabled for each item
+                opt.$menu.children().each(function () {
+                    var $item = $(this),
+                        key = $item.data('contextMenuKey'),
+                        item = opt.items[key],
+                        disabled = ($.isFunction(item.disabled) && item.disabled.call($trigger, key, root)) || item.disabled === true,
+                        visible;
+                    if ($.isFunction(item.visible)) {
+                        visible = item.visible.call($trigger, key, root);
+                    } else if (typeof item.visible !== 'undefined') {
+                        visible = item.visible === true;
+                    } else {
+                        visible = true;
+                    }
+
+                    if (visible) {
+                        hasVisibleItems = true;
+                    }
+
+                    $item[visible ? 'show' : 'hide']();
+
+                    // dis- / enable item
+                    $item[disabled ? 'addClass' : 'removeClass'](root.classNames.disabled);
+
+                    if ($.isFunction(item.icon)) {
+                        $item.removeClass(item._icon);
+                        var iconResult = item.icon.call(this, $trigger, $item, key, item);
+                        if(typeof(iconResult) === "string"){
+                            $item.addClass(iconResult);
+                        } else {
+                            $item.prepend(iconResult);
+                        }
+                    }
+
+                    if (item.type) {
+                        // dis- / enable input elements
+                        $item.find('input, select, textarea').prop('disabled', disabled);
+
+                        // update input states
+                        switch (item.type) {
+                            case 'text':
+                            case 'textarea':
+                                item.$input.val(item.value || '');
+                                break;
+
+                            case 'checkbox':
+                            case 'radio':
+                                item.$input.val(item.value || '').prop('checked', !!item.selected);
+                                break;
+
+                            case 'select':
+                                item.$input.val((item.selected === 0 ? "0" : item.selected) || '');
+                                break;
+                        }
+                    }
+
+                    if (item.$menu) {
+                        // update sub-menu
+                        var subMenuHasVisibleItems = op.update.call($trigger, item, root);
+                        if (subMenuHasVisibleItems) {
+                            hasVisibleItems = true;
+                        }
+                    }
+                });
+                return hasVisibleItems;
+            },
+            layer: function (opt, zIndex) {
+                // add transparent layer for click area
+                // filter and background for Internet Explorer, Issue #23
+                var $layer = opt.$layer = $('<div id="context-menu-layer"></div>')
+                    .css({
+                        height: $win.height(),
+                        width: $win.width(),
+                        display: 'block',
+                        position: 'fixed',
+                        'z-index': zIndex - 1,
+                        top: 0,
+                        left: 0,
+                        opacity: 0,
+                        filter: 'alpha(opacity=0)',
+                        'background-color': '#000'
+                    })
+                    .data('contextMenuRoot', opt)
+                    .appendTo(document.body)
+                    .on('contextmenu', handle.abortevent)
+                    .on('mousedown', handle.layerClick);
+
+                // IE6 doesn't know position:fixed;
+                if (typeof document.body.style.maxWidth === 'undefined') { // IE6 doesn't support maxWidth
+                    $layer.css({
+                        'position': 'absolute',
+                        'height': $(document).height()
+                    });
+                }
+
+                return $layer;
+            },
+            processPromises: function (opt, root, promise) {
+                // Start
+                opt.$node.addClass(root.classNames.iconLoadingClass);
+
+                function completedPromise(opt, root, items) {
+                    // Completed promise (dev called promise.resolve). We now have a list of items which can
+                    // be used to create the rest of the context menu.
+                    if (typeof items === 'undefined') {
+                        // Null result, dev should have checked
+                        errorPromise(undefined);//own error object
+                    }
+                    finishPromiseProcess(opt, root, items);
+                }
+
+                function errorPromise(opt, root, errorItem) {
+                    // User called promise.reject() with an error item, if not, provide own error item.
+                    if (typeof errorItem === 'undefined') {
+                        errorItem = {
+                            "error": {
+                                name: "No items and no error item",
+                                icon: "context-menu-icon context-menu-icon-quit"
+                            }
+                        };
+                        if (window.console) {
+                            (console.error || console.log).call(console, 'When you reject a promise, provide an "items" object, equal to normal sub-menu items');
+                        }
+                    } else if (typeof errorItem === 'string') {
+                        errorItem = {"error": {name: errorItem}};
+                    }
+                    finishPromiseProcess(opt, root, errorItem);
+                }
+
+                function finishPromiseProcess(opt, root, items) {
+                    if (typeof root.$menu === 'undefined' || !root.$menu.is(':visible')) {
+                        return;
+                    }
+                    opt.$node.removeClass(root.classNames.iconLoadingClass);
+                    opt.items = items;
+                    op.create(opt, root, true); // Create submenu
+                    op.update(opt, root); // Correctly update position if user is already hovered over menu item
+                    root.positionSubmenu.call(opt.$node, opt.$menu); // positionSubmenu, will only do anything if user already hovered over menu item that just got new subitems.
+                }
+
+                // Wait for promise completion. .then(success, error, notify) (we don't track notify). Bind the opt
+                // and root to avoid scope problems
+                promise.then(completedPromise.bind(this, opt, root), errorPromise.bind(this, opt, root));
+            },
+            // operation that will run after contextMenu showed on screen
+            activated: function(opt){
+                var $menu = opt.$menu;
+                var $menuOffset = $menu.offset();
+                var winHeight = $(window).height();
+                var winScrollTop = $(window).scrollTop();
+                var menuHeight = $menu.height();
+                if(menuHeight > winHeight){
+                    $menu.css({
+                        'height' : winHeight + 'px',
+                        'overflow-x': 'hidden',
+                        'overflow-y': 'auto',
+                        'top': winScrollTop + 'px'
+                    });
+                } else if(($menuOffset.top < winScrollTop) || ($menuOffset.top + menuHeight > winScrollTop + winHeight)){
+                    $menu.css({
+                        'top': winScrollTop + 'px'
+                    });
+                }
+            }
+        };
+
+    // split accesskey according to http://www.whatwg.org/specs/web-apps/current-work/multipage/editing.html#assigned-access-key
+    function splitAccesskey(val) {
+        var t = val.split(/\s+/);
+        var keys = [];
+
+        for (var i = 0, k; k = t[i]; i++) {
+            k = k.charAt(0).toUpperCase(); // first character only
+            // theoretically non-accessible characters should be ignored, but different systems, different keyboard layouts, ... screw it.
+            // a map to look up already used access keys would be nice
+            keys.push(k);
+        }
+
+        return keys;
+    }
+
+// handle contextMenu triggers
+    $.fn.contextMenu = function (operation) {
+        var $t = this, $o = operation;
+        if (this.length > 0) {  // this is not a build on demand menu
+            if (typeof operation === 'undefined') {
+                this.first().trigger('contextmenu');
+            } else if (typeof operation.x !== 'undefined' && typeof operation.y !== 'undefined') {
+                this.first().trigger($.Event('contextmenu', {
+                    pageX: operation.x,
+                    pageY: operation.y,
+                    mouseButton: operation.button
+                }));
+            } else if (operation === 'hide') {
+                var $menu = this.first().data('contextMenu') ? this.first().data('contextMenu').$menu : null;
+                if ($menu) {
+                    $menu.trigger('contextmenu:hide');
+                }
+            } else if (operation === 'destroy') {
+                $.contextMenu('destroy', {context: this});
+            } else if ($.isPlainObject(operation)) {
+                operation.context = this;
+                $.contextMenu('create', operation);
+            } else if (operation) {
+                this.removeClass('context-menu-disabled');
+            } else if (!operation) {
+                this.addClass('context-menu-disabled');
+            }
+        } else {
+            $.each(menus, function () {
+                if (this.selector === $t.selector) {
+                    $o.data = this;
+
+                    $.extend($o.data, {trigger: 'demand'});
+                }
+            });
+
+            handle.contextmenu.call($o.target, $o);
+        }
+
+        return this;
+    };
+
+    // manage contextMenu instances
+    $.contextMenu = function (operation, options) {
+        if (typeof operation !== 'string') {
+            options = operation;
+            operation = 'create';
+        }
+
+        if (typeof options === 'string') {
+            options = {selector: options};
+        } else if (typeof options === 'undefined') {
+            options = {};
+        }
+
+        // merge with default options
+        var o = $.extend(true, {}, defaults, options || {});
+        var $document = $(document);
+        var $context = $document;
+        var _hasContext = false;
+
+        if (!o.context || !o.context.length) {
+            o.context = document;
+        } else {
+            // you never know what they throw at you...
+            $context = $(o.context).first();
+            o.context = $context.get(0);
+            _hasContext = !$(o.context).is(document);
+        }
+
+        switch (operation) {
+
+            case 'update':
+                // Updates visibility and such
+                if(_hasContext){
+                    op.update($context);
+                } else {
+                    for(var menu in menus){
+                        if(menus.hasOwnProperty(menu)){
+                            op.update(menus[menu]);
+                        }
+                    }
+                }
+                break;
+
+            case 'create':
+                // no selector no joy
+                if (!o.selector) {
+                    throw new Error('No selector specified');
+                }
+                // make sure internal classes are not bound to
+                if (o.selector.match(/.context-menu-(list|item|input)($|\s)/)) {
+                    throw new Error('Cannot bind to selector "' + o.selector + '" as it contains a reserved className');
+                }
+                if (!o.build && (!o.items || $.isEmptyObject(o.items))) {
+                    throw new Error('No Items specified');
+                }
+                counter++;
+                o.ns = '.contextMenu' + counter;
+                if (!_hasContext) {
+                    namespaces[o.selector] = o.ns;
+                }
+                menus[o.ns] = o;
+
+                // default to right click
+                if (!o.trigger) {
+                    o.trigger = 'right';
+                }
+
+                if (!initialized) {
+                    var itemClick = o.itemClickEvent === 'click' ? 'click.contextMenu' : 'mouseup.contextMenu';
+                    var contextMenuItemObj = {
+                        // 'mouseup.contextMenu': handle.itemClick,
+                        // 'click.contextMenu': handle.itemClick,
+                        'contextmenu:focus.contextMenu': handle.focusItem,
+                        'contextmenu:blur.contextMenu': handle.blurItem,
+                        'contextmenu.contextMenu': handle.abortevent,
+                        'mouseenter.contextMenu': handle.itemMouseenter,
+                        'mouseleave.contextMenu': handle.itemMouseleave
+                    };
+                    contextMenuItemObj[itemClick] = handle.itemClick;
+                    // make sure item click is registered first
+                    $document
+                        .on({
+                            'contextmenu:hide.contextMenu': handle.hideMenu,
+                            'prevcommand.contextMenu': handle.prevItem,
+                            'nextcommand.contextMenu': handle.nextItem,
+                            'contextmenu.contextMenu': handle.abortevent,
+                            'mouseenter.contextMenu': handle.menuMouseenter,
+                            'mouseleave.contextMenu': handle.menuMouseleave
+                        }, '.context-menu-list')
+                        .on('mouseup.contextMenu', '.context-menu-input', handle.inputClick)
+                        .on(contextMenuItemObj, '.context-menu-item');
+
+                    initialized = true;
+                }
+
+                // engage native contextmenu event
+                $context
+                    .on('contextmenu' + o.ns, o.selector, o, handle.contextmenu);
+
+                if (_hasContext) {
+                    // add remove hook, just in case
+                    $context.on('remove' + o.ns, function () {
+                        $(this).contextMenu('destroy');
+                    });
+                }
+
+                switch (o.trigger) {
+                    case 'hover':
+                        $context
+                            .on('mouseenter' + o.ns, o.selector, o, handle.mouseenter)
+                            .on('mouseleave' + o.ns, o.selector, o, handle.mouseleave);
+                        break;
+
+                    case 'left':
+                        $context.on('click' + o.ns, o.selector, o, handle.click);
+                        break;
+				    case 'touchstart':
+                        $context.on('touchstart' + o.ns, o.selector, o, handle.click);
+                        break;
+                    /*
+                     default:
+                     // http://www.quirksmode.org/dom/events/contextmenu.html
+                     $document
+                     .on('mousedown' + o.ns, o.selector, o, handle.mousedown)
+                     .on('mouseup' + o.ns, o.selector, o, handle.mouseup);
+                     break;
+                     */
+                }
+
+                // create menu
+                if (!o.build) {
+                    op.create(o);
+                }
+                break;
+
+            case 'destroy':
+                var $visibleMenu;
+                if (_hasContext) {
+                    // get proper options
+                    var context = o.context;
+                    $.each(menus, function (ns, o) {
+
+                        if (!o) {
+                            return true;
+                        }
+
+                        // Is this menu equest to the context called from
+                        if (!$(context).is(o.selector)) {
+                            return true;
+                        }
+
+                        $visibleMenu = $('.context-menu-list').filter(':visible');
+                        if ($visibleMenu.length && $visibleMenu.data().contextMenuRoot.$trigger.is($(o.context).find(o.selector))) {
+                            $visibleMenu.trigger('contextmenu:hide', {force: true});
+                        }
+
+                        try {
+                            if (menus[o.ns].$menu) {
+                                menus[o.ns].$menu.remove();
+                            }
+
+                            delete menus[o.ns];
+                        } catch (e) {
+                            menus[o.ns] = null;
+                        }
+
+                        $(o.context).off(o.ns);
+
+                        return true;
+                    });
+                } else if (!o.selector) {
+                    $document.off('.contextMenu .contextMenuAutoHide');
+                    $.each(menus, function (ns, o) {
+                        $(o.context).off(o.ns);
+                    });
+
+                    namespaces = {};
+                    menus = {};
+                    counter = 0;
+                    initialized = false;
+
+                    $('#context-menu-layer, .context-menu-list').remove();
+                } else if (namespaces[o.selector]) {
+                    $visibleMenu = $('.context-menu-list').filter(':visible');
+                    if ($visibleMenu.length && $visibleMenu.data().contextMenuRoot.$trigger.is(o.selector)) {
+                        $visibleMenu.trigger('contextmenu:hide', {force: true});
+                    }
+
+                    try {
+                        if (menus[namespaces[o.selector]].$menu) {
+                            menus[namespaces[o.selector]].$menu.remove();
+                        }
+
+                        delete menus[namespaces[o.selector]];
+                    } catch (e) {
+                        menus[namespaces[o.selector]] = null;
+                    }
+
+                    $document.off(namespaces[o.selector]);
+                }
+                break;
+
+            case 'html5':
+                // if <command> and <menuitem> are not handled by the browser,
+                // or options was a bool true,
+                // initialize $.contextMenu for them
+                if ((!$.support.htmlCommand && !$.support.htmlMenuitem) || (typeof options === 'boolean' && options)) {
+                    $('menu[type="context"]').each(function () {
+                        if (this.id) {
+                            $.contextMenu({
+                                selector: '[contextmenu=' + this.id + ']',
+                                items: $.contextMenu.fromMenu(this)
+                            });
+                        }
+                    }).css('display', 'none');
+                }
+                break;
+
+            default:
+                throw new Error('Unknown operation "' + operation + '"');
+        }
+
+        return this;
+    };
+
+// import values into <input> commands
+    $.contextMenu.setInputValues = function (opt, data) {
+        if (typeof data === 'undefined') {
+            data = {};
+        }
+
+        $.each(opt.inputs, function (key, item) {
+            switch (item.type) {
+                case 'text':
+                case 'textarea':
+                    item.value = data[key] || '';
+                    break;
+
+                case 'checkbox':
+                    item.selected = data[key] ? true : false;
+                    break;
+
+                case 'radio':
+                    item.selected = (data[item.radio] || '') === item.value;
+                    break;
+
+                case 'select':
+                    item.selected = data[key] || '';
+                    break;
+            }
+        });
+    };
+
+// export values from <input> commands
+    $.contextMenu.getInputValues = function (opt, data) {
+        if (typeof data === 'undefined') {
+            data = {};
+        }
+
+        $.each(opt.inputs, function (key, item) {
+            switch (item.type) {
+                case 'text':
+                case 'textarea':
+                case 'select':
+                    data[key] = item.$input.val();
+                    break;
+
+                case 'checkbox':
+                    data[key] = item.$input.prop('checked');
+                    break;
+
+                case 'radio':
+                    if (item.$input.prop('checked')) {
+                        data[item.radio] = item.value;
+                    }
+                    break;
+            }
+        });
+
+        return data;
+    };
+
+// find <label for="xyz">
+    function inputLabel(node) {
+        return (node.id && $('label[for="' + node.id + '"]').val()) || node.name;
+    }
+
+// convert <menu> to items object
+    function menuChildren(items, $children, counter) {
+        if (!counter) {
+            counter = 0;
+        }
+
+        $children.each(function () {
+            var $node = $(this),
+                node = this,
+                nodeName = this.nodeName.toLowerCase(),
+                label,
+                item;
+
+            // extract <label><input>
+            if (nodeName === 'label' && $node.find('input, textarea, select').length) {
+                label = $node.text();
+                $node = $node.children().first();
+                node = $node.get(0);
+                nodeName = node.nodeName.toLowerCase();
+            }
+
+            /*
+             * <menu> accepts flow-content as children. that means <embed>, <canvas> and such are valid menu items.
+             * Not being the sadistic kind, $.contextMenu only accepts:
+             * <command>, <menuitem>, <hr>, <span>, <p> <input [text, radio, checkbox]>, <textarea>, <select> and of course <menu>.
+             * Everything else will be imported as an html node, which is not interfaced with contextMenu.
+             */
+
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/commands.html#concept-command
+            switch (nodeName) {
+                // http://www.whatwg.org/specs/web-apps/current-work/multipage/interactive-elements.html#the-menu-element
+                case 'menu':
+                    item = {name: $node.attr('label'), items: {}};
+                    counter = menuChildren(item.items, $node.children(), counter);
+                    break;
+
+                // http://www.whatwg.org/specs/web-apps/current-work/multipage/commands.html#using-the-a-element-to-define-a-command
+                case 'a':
+                // http://www.whatwg.org/specs/web-apps/current-work/multipage/commands.html#using-the-button-element-to-define-a-command
+                case 'button':
+                    item = {
+                        name: $node.text(),
+                        disabled: !!$node.attr('disabled'),
+                        callback: (function () {
+                            return function () {
+                                $node.get(0).click();
+                            };
+                        })()
+                    };
+                    break;
+
+                // http://www.whatwg.org/specs/web-apps/current-work/multipage/commands.html#using-the-command-element-to-define-a-command
+                case 'menuitem':
+                case 'command':
+                    switch ($node.attr('type')) {
+                        case undefined:
+                        case 'command':
+                        case 'menuitem':
+                            item = {
+                                name: $node.attr('label'),
+                                disabled: !!$node.attr('disabled'),
+                                icon: $node.attr('icon'),
+                                callback: (function () {
+                                    return function () {
+                                        $node.get(0).click();
+                                    };
+                                })()
+                            };
+                            break;
+
+                        case 'checkbox':
+                            item = {
+                                type: 'checkbox',
+                                disabled: !!$node.attr('disabled'),
+                                name: $node.attr('label'),
+                                selected: !!$node.attr('checked')
+                            };
+                            break;
+                        case 'radio':
+                            item = {
+                                type: 'radio',
+                                disabled: !!$node.attr('disabled'),
+                                name: $node.attr('label'),
+                                radio: $node.attr('radiogroup'),
+                                value: $node.attr('id'),
+                                selected: !!$node.attr('checked')
+                            };
+                            break;
+
+                        default:
+                            item = undefined;
+                    }
+                    break;
+
+                case 'hr':
+                    item = '-------';
+                    break;
+
+                case 'input':
+                    switch ($node.attr('type')) {
+                        case 'text':
+                            item = {
+                                type: 'text',
+                                name: label || inputLabel(node),
+                                disabled: !!$node.attr('disabled'),
+                                value: $node.val()
+                            };
+                            break;
+
+                        case 'checkbox':
+                            item = {
+                                type: 'checkbox',
+                                name: label || inputLabel(node),
+                                disabled: !!$node.attr('disabled'),
+                                selected: !!$node.attr('checked')
+                            };
+                            break;
+
+                        case 'radio':
+                            item = {
+                                type: 'radio',
+                                name: label || inputLabel(node),
+                                disabled: !!$node.attr('disabled'),
+                                radio: !!$node.attr('name'),
+                                value: $node.val(),
+                                selected: !!$node.attr('checked')
+                            };
+                            break;
+
+                        default:
+                            item = undefined;
+                            break;
+                    }
+                    break;
+
+                case 'select':
+                    item = {
+                        type: 'select',
+                        name: label || inputLabel(node),
+                        disabled: !!$node.attr('disabled'),
+                        selected: $node.val(),
+                        options: {}
+                    };
+                    $node.children().each(function () {
+                        item.options[this.value] = $(this).text();
+                    });
+                    break;
+
+                case 'textarea':
+                    item = {
+                        type: 'textarea',
+                        name: label || inputLabel(node),
+                        disabled: !!$node.attr('disabled'),
+                        value: $node.val()
+                    };
+                    break;
+
+                case 'label':
+                    break;
+
+                default:
+                    item = {type: 'html', html: $node.clone(true)};
+                    break;
+            }
+
+            if (item) {
+                counter++;
+                items['key' + counter] = item;
+            }
+        });
+
+        return counter;
+    }
+
+// convert html5 menu
+    $.contextMenu.fromMenu = function (element) {
+        var $this = $(element),
+            items = {};
+
+        menuChildren(items, $this.children());
+
+        return items;
+    };
+
+// make defaults accessible
+    $.contextMenu.defaults = defaults;
+    $.contextMenu.types = types;
+// export internal functions - undocumented, for hacking only!
+    $.contextMenu.handle = handle;
+    $.contextMenu.op = op;
+    $.contextMenu.menus = menus;
+});
+
+},{"jquery":17}],17:[function(require,module,exports){
 /*!
  * jQuery JavaScript Library v3.5.1
  * https://jquery.com/
@@ -12171,7 +20519,193 @@ if ( typeof noGlobal === "undefined" ) {
 return jQuery;
 } );
 
-},{}],3:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
+// shim for using process in browser
+var process = module.exports = {};
+
+// cached from whatever global is present so that test runners that stub it
+// don't break things.  But we need to wrap it in a try catch in case it is
+// wrapped in strict mode code which doesn't define any globals.  It's inside a
+// function because try/catches deoptimize in certain engines.
+
+var cachedSetTimeout;
+var cachedClearTimeout;
+
+function defaultSetTimout() {
+    throw new Error('setTimeout has not been defined');
+}
+function defaultClearTimeout () {
+    throw new Error('clearTimeout has not been defined');
+}
+(function () {
+    try {
+        if (typeof setTimeout === 'function') {
+            cachedSetTimeout = setTimeout;
+        } else {
+            cachedSetTimeout = defaultSetTimout;
+        }
+    } catch (e) {
+        cachedSetTimeout = defaultSetTimout;
+    }
+    try {
+        if (typeof clearTimeout === 'function') {
+            cachedClearTimeout = clearTimeout;
+        } else {
+            cachedClearTimeout = defaultClearTimeout;
+        }
+    } catch (e) {
+        cachedClearTimeout = defaultClearTimeout;
+    }
+} ())
+function runTimeout(fun) {
+    if (cachedSetTimeout === setTimeout) {
+        //normal enviroments in sane situations
+        return setTimeout(fun, 0);
+    }
+    // if setTimeout wasn't available but was latter defined
+    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
+        cachedSetTimeout = setTimeout;
+        return setTimeout(fun, 0);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedSetTimeout(fun, 0);
+    } catch(e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
+            return cachedSetTimeout.call(null, fun, 0);
+        } catch(e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
+            return cachedSetTimeout.call(this, fun, 0);
+        }
+    }
+
+
+}
+function runClearTimeout(marker) {
+    if (cachedClearTimeout === clearTimeout) {
+        //normal enviroments in sane situations
+        return clearTimeout(marker);
+    }
+    // if clearTimeout wasn't available but was latter defined
+    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
+        cachedClearTimeout = clearTimeout;
+        return clearTimeout(marker);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedClearTimeout(marker);
+    } catch (e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
+            return cachedClearTimeout.call(null, marker);
+        } catch (e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
+            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
+            return cachedClearTimeout.call(this, marker);
+        }
+    }
+
+
+
+}
+var queue = [];
+var draining = false;
+var currentQueue;
+var queueIndex = -1;
+
+function cleanUpNextTick() {
+    if (!draining || !currentQueue) {
+        return;
+    }
+    draining = false;
+    if (currentQueue.length) {
+        queue = currentQueue.concat(queue);
+    } else {
+        queueIndex = -1;
+    }
+    if (queue.length) {
+        drainQueue();
+    }
+}
+
+function drainQueue() {
+    if (draining) {
+        return;
+    }
+    var timeout = runTimeout(cleanUpNextTick);
+    draining = true;
+
+    var len = queue.length;
+    while(len) {
+        currentQueue = queue;
+        queue = [];
+        while (++queueIndex < len) {
+            if (currentQueue) {
+                currentQueue[queueIndex].run();
+            }
+        }
+        queueIndex = -1;
+        len = queue.length;
+    }
+    currentQueue = null;
+    draining = false;
+    runClearTimeout(timeout);
+}
+
+process.nextTick = function (fun) {
+    var args = new Array(arguments.length - 1);
+    if (arguments.length > 1) {
+        for (var i = 1; i < arguments.length; i++) {
+            args[i - 1] = arguments[i];
+        }
+    }
+    queue.push(new Item(fun, args));
+    if (queue.length === 1 && !draining) {
+        runTimeout(drainQueue);
+    }
+};
+
+// v8 likes predictible objects
+function Item(fun, array) {
+    this.fun = fun;
+    this.array = array;
+}
+Item.prototype.run = function () {
+    this.fun.apply(null, this.array);
+};
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+process.version = ''; // empty string to avoid regexp issues
+process.versions = {};
+
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+process.prependListener = noop;
+process.prependOnceListener = noop;
+
+process.listeners = function (name) { return [] }
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
+};
+
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
+process.umask = function() { return 0; };
+
+},{}],19:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   module.exports = {
@@ -12185,7 +20719,7 @@ return jQuery;
 
 }).call(this);
 
-},{}],4:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   module.exports = {
@@ -12212,7 +20746,7 @@ return jQuery;
 
 }).call(this);
 
-},{}],5:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   // Copies all enumerable own properties from `sources` to `target`
@@ -12302,7 +20836,7 @@ return jQuery;
 
 }).call(this);
 
-},{}],6:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   module.exports = {
@@ -12314,7 +20848,7 @@ return jQuery;
 
 }).call(this);
 
-},{}],7:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLAttribute, XMLNode;
@@ -12446,7 +20980,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./XMLNode":26}],8:[function(require,module,exports){
+},{"./NodeType":20,"./XMLNode":42}],24:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLCData, XMLCharacterData;
@@ -12489,7 +21023,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./XMLCharacterData":9}],9:[function(require,module,exports){
+},{"./NodeType":20,"./XMLCharacterData":25}],25:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var XMLCharacterData, XMLNode;
@@ -12577,7 +21111,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./XMLNode":26}],10:[function(require,module,exports){
+},{"./XMLNode":42}],26:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLCharacterData, XMLComment;
@@ -12620,7 +21154,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./XMLCharacterData":9}],11:[function(require,module,exports){
+},{"./NodeType":20,"./XMLCharacterData":25}],27:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var XMLDOMConfiguration, XMLDOMErrorHandler, XMLDOMStringList;
@@ -12702,7 +21236,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./XMLDOMErrorHandler":12,"./XMLDOMStringList":14}],12:[function(require,module,exports){
+},{"./XMLDOMErrorHandler":28,"./XMLDOMStringList":30}],28:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   // Represents the error handler for DOM operations
@@ -12724,7 +21258,7 @@ return jQuery;
 
 }).call(this);
 
-},{}],13:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   // Implements the DOMImplementation interface
@@ -12781,7 +21315,7 @@ return jQuery;
 
 }).call(this);
 
-},{}],14:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   // Represents a list of string entries
@@ -12827,7 +21361,7 @@ return jQuery;
 
 }).call(this);
 
-},{}],15:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLDTDAttList, XMLNode;
@@ -12895,7 +21429,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./XMLNode":26}],16:[function(require,module,exports){
+},{"./NodeType":20,"./XMLNode":42}],32:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLDTDElement, XMLNode;
@@ -12941,7 +21475,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./XMLNode":26}],17:[function(require,module,exports){
+},{"./NodeType":20,"./XMLNode":42}],33:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLDTDEntity, XMLNode, isObject;
@@ -13058,7 +21592,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./Utility":5,"./XMLNode":26}],18:[function(require,module,exports){
+},{"./NodeType":20,"./Utility":21,"./XMLNode":42}],34:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLDTDNotation, XMLNode;
@@ -13126,7 +21660,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./XMLNode":26}],19:[function(require,module,exports){
+},{"./NodeType":20,"./XMLNode":42}],35:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLDeclaration, XMLNode, isObject;
@@ -13179,7 +21713,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./Utility":5,"./XMLNode":26}],20:[function(require,module,exports){
+},{"./NodeType":20,"./Utility":21,"./XMLNode":42}],36:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLDTDAttList, XMLDTDElement, XMLDTDEntity, XMLDTDNotation, XMLDocType, XMLNamedNodeMap, XMLNode, isObject;
@@ -13416,7 +21950,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./Utility":5,"./XMLDTDAttList":15,"./XMLDTDElement":16,"./XMLDTDEntity":17,"./XMLDTDNotation":18,"./XMLNamedNodeMap":25,"./XMLNode":26}],21:[function(require,module,exports){
+},{"./NodeType":20,"./Utility":21,"./XMLDTDAttList":31,"./XMLDTDElement":32,"./XMLDTDEntity":33,"./XMLDTDNotation":34,"./XMLNamedNodeMap":41,"./XMLNode":42}],37:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLDOMConfiguration, XMLDOMImplementation, XMLDocument, XMLNode, XMLStringWriter, XMLStringifier, isPlainObject;
@@ -13700,7 +22234,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./Utility":5,"./XMLDOMConfiguration":11,"./XMLDOMImplementation":13,"./XMLNode":26,"./XMLStringWriter":31,"./XMLStringifier":32}],22:[function(require,module,exports){
+},{"./NodeType":20,"./Utility":21,"./XMLDOMConfiguration":27,"./XMLDOMImplementation":29,"./XMLNode":42,"./XMLStringWriter":47,"./XMLStringifier":48}],38:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, WriterState, XMLAttribute, XMLCData, XMLComment, XMLDTDAttList, XMLDTDElement, XMLDTDEntity, XMLDTDNotation, XMLDeclaration, XMLDocType, XMLDocument, XMLDocumentCB, XMLElement, XMLProcessingInstruction, XMLRaw, XMLStringWriter, XMLStringifier, XMLText, getValue, isFunction, isObject, isPlainObject,
@@ -14352,7 +22886,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./Utility":5,"./WriterState":6,"./XMLAttribute":7,"./XMLCData":8,"./XMLComment":10,"./XMLDTDAttList":15,"./XMLDTDElement":16,"./XMLDTDEntity":17,"./XMLDTDNotation":18,"./XMLDeclaration":19,"./XMLDocType":20,"./XMLDocument":21,"./XMLElement":24,"./XMLProcessingInstruction":28,"./XMLRaw":29,"./XMLStringWriter":31,"./XMLStringifier":32,"./XMLText":33}],23:[function(require,module,exports){
+},{"./NodeType":20,"./Utility":21,"./WriterState":22,"./XMLAttribute":23,"./XMLCData":24,"./XMLComment":26,"./XMLDTDAttList":31,"./XMLDTDElement":32,"./XMLDTDEntity":33,"./XMLDTDNotation":34,"./XMLDeclaration":35,"./XMLDocType":36,"./XMLDocument":37,"./XMLElement":40,"./XMLProcessingInstruction":44,"./XMLRaw":45,"./XMLStringWriter":47,"./XMLStringifier":48,"./XMLText":49}],39:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLDummy, XMLNode;
@@ -14393,7 +22927,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./XMLNode":26}],24:[function(require,module,exports){
+},{"./NodeType":20,"./XMLNode":42}],40:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLAttribute, XMLElement, XMLNamedNodeMap, XMLNode, getValue, isFunction, isObject,
@@ -14729,7 +23263,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./Utility":5,"./XMLAttribute":7,"./XMLNamedNodeMap":25,"./XMLNode":26}],25:[function(require,module,exports){
+},{"./NodeType":20,"./Utility":21,"./XMLAttribute":23,"./XMLNamedNodeMap":41,"./XMLNode":42}],41:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   // Represents a map of nodes accessed by a string key
@@ -14808,7 +23342,7 @@ return jQuery;
 
 }).call(this);
 
-},{}],26:[function(require,module,exports){
+},{}],42:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var DocumentPosition, NodeType, XMLCData, XMLComment, XMLDeclaration, XMLDocType, XMLDummy, XMLElement, XMLNamedNodeMap, XMLNode, XMLNodeList, XMLProcessingInstruction, XMLRaw, XMLText, getValue, isEmpty, isFunction, isObject,
@@ -15809,7 +24343,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./DocumentPosition":3,"./NodeType":4,"./Utility":5,"./XMLCData":8,"./XMLComment":10,"./XMLDeclaration":19,"./XMLDocType":20,"./XMLDummy":23,"./XMLElement":24,"./XMLNamedNodeMap":25,"./XMLNodeList":27,"./XMLProcessingInstruction":28,"./XMLRaw":29,"./XMLText":33}],27:[function(require,module,exports){
+},{"./DocumentPosition":19,"./NodeType":20,"./Utility":21,"./XMLCData":24,"./XMLComment":26,"./XMLDeclaration":35,"./XMLDocType":36,"./XMLDummy":39,"./XMLElement":40,"./XMLNamedNodeMap":41,"./XMLNodeList":43,"./XMLProcessingInstruction":44,"./XMLRaw":45,"./XMLText":49}],43:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   // Represents a list of nodes
@@ -15856,7 +24390,7 @@ return jQuery;
 
 }).call(this);
 
-},{}],28:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLCharacterData, XMLProcessingInstruction;
@@ -15914,7 +24448,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./XMLCharacterData":9}],29:[function(require,module,exports){
+},{"./NodeType":20,"./XMLCharacterData":25}],45:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLNode, XMLRaw;
@@ -15956,7 +24490,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./XMLNode":26}],30:[function(require,module,exports){
+},{"./NodeType":20,"./XMLNode":42}],46:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, WriterState, XMLStreamWriter, XMLWriterBase,
@@ -16167,7 +24701,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./WriterState":6,"./XMLWriterBase":34}],31:[function(require,module,exports){
+},{"./NodeType":20,"./WriterState":22,"./XMLWriterBase":50}],47:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var XMLStringWriter, XMLWriterBase;
@@ -16209,7 +24743,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./XMLWriterBase":34}],32:[function(require,module,exports){
+},{"./XMLWriterBase":50}],48:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   // Converts values to strings
@@ -16502,7 +25036,7 @@ return jQuery;
 
 }).call(this);
 
-},{}],33:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLCharacterData, XMLText;
@@ -16586,7 +25120,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./XMLCharacterData":9}],34:[function(require,module,exports){
+},{"./NodeType":20,"./XMLCharacterData":25}],50:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, WriterState, XMLCData, XMLComment, XMLDTDAttList, XMLDTDElement, XMLDTDEntity, XMLDTDNotation, XMLDeclaration, XMLDocType, XMLDummy, XMLElement, XMLProcessingInstruction, XMLRaw, XMLText, XMLWriterBase, assign,
@@ -17073,7 +25607,7 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./Utility":5,"./WriterState":6,"./XMLCData":8,"./XMLComment":10,"./XMLDTDAttList":15,"./XMLDTDElement":16,"./XMLDTDEntity":17,"./XMLDTDNotation":18,"./XMLDeclaration":19,"./XMLDocType":20,"./XMLDummy":23,"./XMLElement":24,"./XMLProcessingInstruction":28,"./XMLRaw":29,"./XMLText":33}],35:[function(require,module,exports){
+},{"./NodeType":20,"./Utility":21,"./WriterState":22,"./XMLCData":24,"./XMLComment":26,"./XMLDTDAttList":31,"./XMLDTDElement":32,"./XMLDTDEntity":33,"./XMLDTDNotation":34,"./XMLDeclaration":35,"./XMLDocType":36,"./XMLDummy":39,"./XMLElement":40,"./XMLProcessingInstruction":44,"./XMLRaw":45,"./XMLText":49}],51:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, WriterState, XMLDOMImplementation, XMLDocument, XMLDocumentCB, XMLStreamWriter, XMLStringWriter, assign, isFunction;
@@ -17195,11 +25729,15 @@ return jQuery;
 
 }).call(this);
 
-},{"./NodeType":4,"./Utility":5,"./WriterState":6,"./XMLDOMImplementation":13,"./XMLDocument":21,"./XMLDocumentCB":22,"./XMLStreamWriter":30,"./XMLStringWriter":31}],36:[function(require,module,exports){
+},{"./NodeType":20,"./Utility":21,"./WriterState":22,"./XMLDOMImplementation":29,"./XMLDocument":37,"./XMLDocumentCB":38,"./XMLStreamWriter":46,"./XMLStringWriter":47}],52:[function(require,module,exports){
 (function (global){
+const popper = require('@popperjs/core');
+
 const $ = require('jquery');
 const humanizeDuration = require('humanize-duration');
 const xmlbuilder = require('xmlbuilder');
+require('datejs');
+require('jquery-contextmenu');
 
 global.$ = $;
 
@@ -17234,7 +25772,10 @@ $(() => {
 
         function getWordCountFromScript(script) {
           const regex = /\b(\w+)\b/g;
-          return script.match(regex).length;
+          if (script.match(regex)) {
+            return script.match(regex).length;
+          }
+          return 0;
         }
 
         setTimeout(() => {
@@ -17405,28 +25946,47 @@ $(() => {
         paused: 3,
       };
       this.audio = $('#audio');
+      this.elapsedTime = $('#elapsed');
+      this.totalTime = $('#total');
 
       function getAudioWPM() {
         return Math.round(model.wordCount / (playWidgetView.audio[0].duration / 60));
       }
 
-      this.audio.on('loadedmetadata', function setProgressBarMax() {
-        playWidgetView.progressBar.attr('max', this.duration);
-        controller.wpmUpdated(getAudioWPM());
-        wpmRangeView.starterWPM = getAudioWPM();
-      });
-
-      this.audio.on('timeupdate', function updateProgressBar() {
-        playWidgetView.progressBar.val(this.currentTime);
-      });
+      function formattedTime(seconds) {
+        return (new Date()).clearTime()
+          .addSeconds(Math.round(seconds))
+          .toString('mm:ss');
+      }
 
       this.progressBar.on('input', function seekAudio() {
         playWidgetView.audio[0].currentTime = $(this).val();
       });
 
-      this.audio.on('ended', () => {
-        controller.updatePlayStatus(3);
-        playWidgetView.audio[0].currentTime = 0;
+      this.audio.on({
+        play: () => {
+          controller.updatePlayStatus(2);
+        },
+        pause: () => {
+          // controller.updatePlayStatus(3);
+        },
+        ended: () => {
+          controller.updatePlayStatus(3);
+          playWidgetView.audio[0].currentTime = 0;
+        },
+        timeupdate: function updateProgressBar() {
+          playWidgetView.progressBar.val(this.currentTime);
+
+          playWidgetView.elapsedTime.text(formattedTime(this.currentTime / this.playbackRate));
+          playWidgetView.totalTime.text(formattedTime(this.duration / this.playbackRate));
+        },
+        loadedmetadata: function setProgressBarMax() {
+          playWidgetView.progressBar.attr('max', this.duration);
+          wpmRangeView.starterWPM = getAudioWPM();
+          controller.wpmUpdated(getAudioWPM());
+          playWidgetView.elapsedTime.text(formattedTime(this.currentTime / this.playbackRate));
+          playWidgetView.totalTime.text(formattedTime(this.duration / this.playbackRate));
+        },
       });
 
       playWidgetView.render(controller.getPlayStatus());
@@ -17434,6 +25994,8 @@ $(() => {
 
     render(status) {
       if (status === this.statuses.none) {
+        this.audio.src = '';
+        this.audio[0].pause();
         this.playWidget.addClass('hidden');
         this.loadIndicator.addClass('hidden');
         this.player.addClass('hidden');
@@ -17451,6 +26013,85 @@ $(() => {
 
   };
 
+  const menuView = {
+    init() {
+      this.downloadLink = $('#download-button');
+
+      const info = $('#pop')[0];
+      const tooltip = $('#pop-up')[0];
+
+      const pop = popper.createPopper(info, tooltip, {
+        placement: 'top',
+        modifiers: [
+          {
+            name: 'offset',
+            options: {
+              offset: [0, 8],
+            },
+          },
+        ],
+      });
+
+      $('#pop-up-check').change(function onCheck() {
+        if (this.checked) {
+          $('#pop-up').attr('data-show', '');
+        } else {
+          $('#pop-up').removeAttr('data-show');
+        }
+        pop.update();
+      });
+    },
+
+    render(downloadLink, voiceList) {
+
+      console.log(voiceList);
+
+      const menuObject = {
+        selector: '#option-button',
+        trigger: 'left',
+        hideOnSecondTrigger: true,
+        items: {
+          clear: {
+            name: 'Clear audio',
+            icon: '',
+            callback() {
+              controller.updatePlayStatus(0);
+            },
+          },
+          download: {
+            name: `<a href="${downloadLink}" id="download-button" download="script-audio.mp3">
+              Download
+            </a>`,
+            isHtmlName: true,
+            icon: 'download',
+          },
+          voices: {
+            name: 'Change voice',
+            items: {
+            },
+          },
+        },
+      };
+
+      voiceList.forEach((voice) => {
+        menuObject.items.voices.items[voice.displayName] = {
+          name: `<span data-voiceName="${voice.name}" class="voice ${voice.displayName === 'Mia' ? 'selected' : ''}"><strong>${voice.displayName}</strong> (${voice.locale}, ${voice.gender})`,
+          isHtmlName: true,
+        };
+      });
+
+      $.contextMenu(menuObject);
+
+      $('.voice').click(function changeVoice() {
+        controller.updatePlayStatus(0);
+        controller.playAudio($(this).attr('data-voiceName'));
+        $('.voice').removeClass('selected');
+        $(this).addClass('selected');
+        $('#option-button').contextMenu('hide');
+      });
+    },
+  };
+
   const controller = {
     init() {
       model.init();
@@ -17461,6 +26102,7 @@ $(() => {
       playMessageView.init();
       playWidgetView.init();
       wpmValueView.init();
+      menuView.init();
     },
 
     renderWPMValue() {
@@ -17548,7 +26190,7 @@ $(() => {
       controller.renderPlayButton();
     },
 
-    fetchAudio(text = this.getTextContent(), voice = 'Microsoft Server Speech Text to Speech Voice (en-US, AriaNeural)') {
+    fetchAudio(voice = 'Microsoft Server Speech Text to Speech Voice (en-GB, MiaNeural)', text = this.getTextContent()) {
       return new Promise((resolve) => {
         $.ajax({
           url: 'https://westus2.api.cognitive.microsoft.com/sts/v1.0/issuetoken',
@@ -17566,7 +26208,7 @@ $(() => {
                 'Content-type': 'application/ssml+xml',
               },
               success: (list) => {
-                const filtered = list.filter((item) => item.Locale.startsWith('en') && item.VoiceType === 'Neural').map((item) => ({
+                const voiceList = list.filter((item) => item.Locale.startsWith('en') && item.VoiceType === 'Neural').map((item) => ({
                   name: item.Name,
                   displayName: item.DisplayName,
                   shortName: item.ShortName,
@@ -17600,7 +26242,7 @@ $(() => {
                   .then((data) => {
                     const blob = new Blob([data], { type: 'audio/mpeg' });
                     const link = window.URL.createObjectURL(blob);
-                    resolve(link);
+                    resolve({ link, voiceList });
                   })
                   .catch((err) => {
                     alert(err);
@@ -17612,15 +26254,17 @@ $(() => {
       });
     },
 
-    playAudio() {
+    playAudio(voice) {
       if (model.playStatus === 0) {
-        $('#audio')[0].pause()
+        $('#audio')[0].pause();
         controller.updatePlayStatus(1);
         controller.renderPlayWidget();
         controller.renderPlayButton();
-        controller.fetchAudio()
-          .then((link) => {
-            $('#audio-source').attr('src', link);
+        controller.fetchAudio(voice)
+          .then((result) => {
+            $('#audio-source').attr('src', result.link);
+
+            menuView.render(result.link, result.voiceList);
             $('#audio')[0].load();
             $('#audio')[0].play()
               .then(() => {
@@ -17649,4 +26293,4 @@ $(() => {
 });
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"humanize-duration":1,"jquery":2,"xmlbuilder":35}]},{},[36]);
+},{"@popperjs/core":1,"datejs":2,"humanize-duration":15,"jquery":17,"jquery-contextmenu":16,"xmlbuilder":51}]},{},[52]);

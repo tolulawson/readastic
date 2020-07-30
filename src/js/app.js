@@ -1,6 +1,10 @@
+const popper = require('@popperjs/core');
+
 const $ = require('jquery');
 const humanizeDuration = require('humanize-duration');
 const xmlbuilder = require('xmlbuilder');
+require('datejs');
+require('jquery-contextmenu');
 
 global.$ = $;
 
@@ -35,7 +39,10 @@ $(() => {
 
         function getWordCountFromScript(script) {
           const regex = /\b(\w+)\b/g;
-          return script.match(regex).length;
+          if (script.match(regex)) {
+            return script.match(regex).length;
+          }
+          return 0;
         }
 
         setTimeout(() => {
@@ -206,28 +213,47 @@ $(() => {
         paused: 3,
       };
       this.audio = $('#audio');
+      this.elapsedTime = $('#elapsed');
+      this.totalTime = $('#total');
 
       function getAudioWPM() {
         return Math.round(model.wordCount / (playWidgetView.audio[0].duration / 60));
       }
 
-      this.audio.on('loadedmetadata', function setProgressBarMax() {
-        playWidgetView.progressBar.attr('max', this.duration);
-        controller.wpmUpdated(getAudioWPM());
-        wpmRangeView.starterWPM = getAudioWPM();
-      });
-
-      this.audio.on('timeupdate', function updateProgressBar() {
-        playWidgetView.progressBar.val(this.currentTime);
-      });
+      function formattedTime(seconds) {
+        return (new Date()).clearTime()
+          .addSeconds(Math.round(seconds))
+          .toString('mm:ss');
+      }
 
       this.progressBar.on('input', function seekAudio() {
         playWidgetView.audio[0].currentTime = $(this).val();
       });
 
-      this.audio.on('ended', () => {
-        controller.updatePlayStatus(3);
-        playWidgetView.audio[0].currentTime = 0;
+      this.audio.on({
+        play: () => {
+          controller.updatePlayStatus(2);
+        },
+        pause: () => {
+          // controller.updatePlayStatus(3);
+        },
+        ended: () => {
+          controller.updatePlayStatus(3);
+          playWidgetView.audio[0].currentTime = 0;
+        },
+        timeupdate: function updateProgressBar() {
+          playWidgetView.progressBar.val(this.currentTime);
+
+          playWidgetView.elapsedTime.text(formattedTime(this.currentTime / this.playbackRate));
+          playWidgetView.totalTime.text(formattedTime(this.duration / this.playbackRate));
+        },
+        loadedmetadata: function setProgressBarMax() {
+          playWidgetView.progressBar.attr('max', this.duration);
+          wpmRangeView.starterWPM = getAudioWPM();
+          controller.wpmUpdated(getAudioWPM());
+          playWidgetView.elapsedTime.text(formattedTime(this.currentTime / this.playbackRate));
+          playWidgetView.totalTime.text(formattedTime(this.duration / this.playbackRate));
+        },
       });
 
       playWidgetView.render(controller.getPlayStatus());
@@ -235,6 +261,8 @@ $(() => {
 
     render(status) {
       if (status === this.statuses.none) {
+        this.audio.src = '';
+        this.audio[0].pause();
         this.playWidget.addClass('hidden');
         this.loadIndicator.addClass('hidden');
         this.player.addClass('hidden');
@@ -252,6 +280,85 @@ $(() => {
 
   };
 
+  const menuView = {
+    init() {
+      this.downloadLink = $('#download-button');
+
+      const info = $('#pop')[0];
+      const tooltip = $('#pop-up')[0];
+
+      const pop = popper.createPopper(info, tooltip, {
+        placement: 'top',
+        modifiers: [
+          {
+            name: 'offset',
+            options: {
+              offset: [0, 8],
+            },
+          },
+        ],
+      });
+
+      $('#pop-up-check').change(function onCheck() {
+        if (this.checked) {
+          $('#pop-up').attr('data-show', '');
+        } else {
+          $('#pop-up').removeAttr('data-show');
+        }
+        pop.update();
+      });
+    },
+
+    render(downloadLink, voiceList) {
+
+      console.log(voiceList);
+
+      const menuObject = {
+        selector: '#option-button',
+        trigger: 'left',
+        hideOnSecondTrigger: true,
+        items: {
+          clear: {
+            name: 'Clear audio',
+            icon: '',
+            callback() {
+              controller.updatePlayStatus(0);
+            },
+          },
+          download: {
+            name: `<a href="${downloadLink}" id="download-button" download="script-audio.mp3">
+              Download
+            </a>`,
+            isHtmlName: true,
+            icon: 'download',
+          },
+          voices: {
+            name: 'Change voice',
+            items: {
+            },
+          },
+        },
+      };
+
+      voiceList.forEach((voice) => {
+        menuObject.items.voices.items[voice.displayName] = {
+          name: `<span data-voiceName="${voice.name}" class="voice ${voice.displayName === 'Mia' ? 'selected' : ''}"><strong>${voice.displayName}</strong> (${voice.locale}, ${voice.gender})`,
+          isHtmlName: true,
+        };
+      });
+
+      $.contextMenu(menuObject);
+
+      $('.voice').click(function changeVoice() {
+        controller.updatePlayStatus(0);
+        controller.playAudio($(this).attr('data-voiceName'));
+        $('.voice').removeClass('selected');
+        $(this).addClass('selected');
+        $('#option-button').contextMenu('hide');
+      });
+    },
+  };
+
   const controller = {
     init() {
       model.init();
@@ -262,6 +369,7 @@ $(() => {
       playMessageView.init();
       playWidgetView.init();
       wpmValueView.init();
+      menuView.init();
     },
 
     renderWPMValue() {
@@ -349,7 +457,7 @@ $(() => {
       controller.renderPlayButton();
     },
 
-    fetchAudio(text = this.getTextContent(), voice = 'Microsoft Server Speech Text to Speech Voice (en-US, AriaNeural)') {
+    fetchAudio(voice = 'Microsoft Server Speech Text to Speech Voice (en-GB, MiaNeural)', text = this.getTextContent()) {
       return new Promise((resolve) => {
         $.ajax({
           url: 'https://westus2.api.cognitive.microsoft.com/sts/v1.0/issuetoken',
@@ -367,7 +475,7 @@ $(() => {
                 'Content-type': 'application/ssml+xml',
               },
               success: (list) => {
-                const filtered = list.filter((item) => item.Locale.startsWith('en') && item.VoiceType === 'Neural').map((item) => ({
+                const voiceList = list.filter((item) => item.Locale.startsWith('en') && item.VoiceType === 'Neural').map((item) => ({
                   name: item.Name,
                   displayName: item.DisplayName,
                   shortName: item.ShortName,
@@ -401,7 +509,7 @@ $(() => {
                   .then((data) => {
                     const blob = new Blob([data], { type: 'audio/mpeg' });
                     const link = window.URL.createObjectURL(blob);
-                    resolve(link);
+                    resolve({ link, voiceList });
                   })
                   .catch((err) => {
                     alert(err);
@@ -413,15 +521,17 @@ $(() => {
       });
     },
 
-    playAudio() {
+    playAudio(voice) {
       if (model.playStatus === 0) {
-        $('#audio')[0].pause()
+        $('#audio')[0].pause();
         controller.updatePlayStatus(1);
         controller.renderPlayWidget();
         controller.renderPlayButton();
-        controller.fetchAudio()
-          .then((link) => {
-            $('#audio-source').attr('src', link);
+        controller.fetchAudio(voice)
+          .then((result) => {
+            $('#audio-source').attr('src', result.link);
+
+            menuView.render(result.link, result.voiceList);
             $('#audio')[0].load();
             $('#audio')[0].play()
               .then(() => {

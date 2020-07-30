@@ -10,13 +10,14 @@ const cleancss = require('gulp-clean-css');
 const jasmineBrowser = require('gulp-jasmine-browser');
 const browserify = require('browserify');
 const source = require('vinyl-source-stream');
+const babelify = require('babelify');
 
 function promisifyStream(stream) {
   return new Promise((resolve) => stream.on('end', resolve));
 }
 
 gulp.task('browserify', function() {
-  return browserify('src/js/app.js')
+  return browserify('src/js/app.js', {sourceType: module})
     .bundle()
     //Pass desired output filename to vinyl-source-stream
     .pipe(source('bundle.js'))
