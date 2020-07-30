@@ -1,6 +1,6 @@
 @import 'jquery.contextMenu.css';
 
-$dark-green: #31728D;
+$dark-green: #2980b9;
 $menu-blue: #D9EEFD;
 $lora: 'lora', serif;
 $merriweather: 'Merriweather', serif;
@@ -361,7 +361,7 @@ body {
             font-family: $merriweather;
             font-size: 1.5rem;
             text-align: center;
-            color: #31728d;
+            color: $dark-green;
             margin-bottom: 15px;
           }
 
@@ -859,6 +859,10 @@ body {
     position: absolute;
     left: 10px;
   }
+}
+
+.context-menu-item.context-menu-hover {
+  background-color: $dark-green;
 }
 
 strong {
