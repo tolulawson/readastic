@@ -1,4 +1,4 @@
-@import 'animate.min';
+@import 'jquery.contextMenu.css';
 
 $dark-green: #31728D;
 $menu-blue: #D9EEFD;
@@ -42,6 +42,14 @@ time, mark, audio, video {
   position: relative;
   // width: 200px;
 
+  #pop-up-check {
+    transform: scale(0);
+    position: absolute;
+
+    &:checked ~ .pop-up {
+      display: block;
+    }
+  }
 
   .info-button {
     background: url(../img/info-icon.svg);
@@ -52,13 +60,7 @@ time, mark, audio, video {
     height: 20px;
     border: none;
 
-    &:focus {
-      outline: none;
-    }
 
-    &:focus + .pop-up {
-      transform: scale(1);
-    }
   }
 
   .pop-up {
@@ -68,18 +70,23 @@ time, mark, audio, video {
     overflow: scroll;
     border-radius: 10px;
     background: #ffffff;
-    position: absolute;
+    // position: absolute;
     font-size: 0.8rem;
     text-align: left;
     padding: 15px;
-    bottom: 20px;
-    left: 20px;
-    transform: scale(0);
-    transform-origin: bottom left;
-    transition: transform 0.2s ease;
+    // bottom: 20px;
+    // left: 20px;
+    // transform: scale(0);
+    // transform-origin: bottom left;
+    // transition: transform 0.2s ease;
     box-shadow: 0px 12px 48px rgba(109,117,141,0.2);
+    display: none;
 
-    button {
+    &[data-show] {
+        display: block;
+      }
+
+    label {
       width: 20px;
       height: 20px;
       float: right;
@@ -90,10 +97,6 @@ time, mark, audio, video {
       background-repeat: no-repeat;
       background-size: 60%;
       background-position: center;
-
-      &:focus {
-        outline: none;
-      }
     }
   }
 
@@ -455,7 +458,7 @@ body {
           border: 1px solid #d1cece;
           border-radius: 10px;
           padding: 15px;
-          outline: none;
+          // outline: none;
           box-shadow: none;
           resize: none;
 
@@ -480,6 +483,8 @@ body {
           flex-wrap: nowrap;
           font-family: $lora;
           color: $gray;
+          width: 60%;
+          max-width: 300px;
 
 
           #play-button {
@@ -502,7 +507,7 @@ body {
             }
 
             &:focus {
-              outline: none;
+              // outline: none;
             }
 
             &:disabled {
@@ -513,12 +518,28 @@ body {
           }
 
           .play-widget {
+            width: 80%;
+
+            .load-animation {
+              float: left;
+            }
 
             .play-indicator {
               display: flex;
+              align-items: center;
 
-              #play-indicator {
-                margin-right: 15px;
+              .progress {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                flex-wrap: nowrap;
+                padding-top: 15px;
+                width: 100%;
+
+                .play-time {
+                  font-size: 0.8rem;
+                  margin-top: 8px;
+                }
               }
 
               .audio-menu {
@@ -531,7 +552,7 @@ body {
                   cursor: pointer;
 
                   &:focus ~ a {
-                    display: flex;
+                    // display: flex;
                   }
                 }
 
@@ -547,7 +568,7 @@ body {
                   color: $gray;
                   font-family: $lora;
                   top: -5px;
-                  left: -5px;
+                  right: -1px;
                   display: none;
 
                   img {
@@ -725,7 +746,7 @@ body {
   }
 
   input[type=range]:focus {
-    outline: none; /* Removes the blue border. You should probably do some kind of focus styling for accessibility reasons though. */
+    // outline: none; /* Removes the blue border. You should probably do some kind of focus styling for accessibility reasons though. */
   }
 
   input[type=range]::-ms-track {
@@ -813,4 +834,33 @@ body {
     background: $dark-green;
   }
 
+}
+
+.context-menu-list {
+    padding: .25em 0;
+    margin: .3em;
+    font-family: $lora;
+    font-size: 0.85rem;
+    border: none;
+    border-radius: .5em;
+    box-shadow: 0px 12px 48px rgba(109,117,141,0.2);
+}
+
+.context-menu-item {
+  padding: .4em 2em;
+
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .selected::before {
+    content: ' ✔';
+    position: absolute;
+    left: 10px;
+  }
+}
+
+strong {
+  font-weight: bold;
 }
