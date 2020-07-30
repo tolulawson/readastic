@@ -209,6 +209,6 @@
         <path id="Path_519" data-name="Path 519" d="M1773.3,1067.126c-2.7.434-4.361,6.167-1.58,7.745,2.989,1.7,5.793-3.41,4.035-6.351A2.4,2.4,0,0,0,1773.3,1067.126Z" transform="translate(-1696.75 -1045.553)" fill="#b8d1ce"/>
       </g>
     </g>
-    <text id="Script_Timer" data-name="Script Timer" transform="translate(987 193)" fill="#31728d" font-size="38" font-family="Merriweather-Regular, Merriweather"><tspan x="0" y="0">Script Timer</tspan></text>
+    <text id="Script_Timer" data-name="Script Timer" transform="translate(987 193)" fill="#2980b9" font-size="38" font-family="Merriweather-Regular, Merriweather"><tspan x="0" y="0">Script Timer</tspan></text>
   </g>
 </svg>

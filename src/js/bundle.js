@@ -26043,9 +26043,6 @@ $(() => {
     },
 
     render(downloadLink, voiceList) {
-
-      console.log(voiceList);
-
       const menuObject = {
         selector: '#option-button',
         trigger: 'left',
@@ -26053,7 +26050,7 @@ $(() => {
         items: {
           clear: {
             name: 'Clear audio',
-            icon: '',
+            icon: 'fa-cloud-download',
             callback() {
               controller.updatePlayStatus(0);
             },
@@ -26144,10 +26141,10 @@ $(() => {
       controller.renderReadTime();
       controller.renderWordCount();
 
-      if (controller.getPlayStatus() < 2) {
+      if (controller.getPlayStatus() !== 2) {
         controller.renderPlayButton();
+        controller.updatePlayStatus(0);
       }
-      // controller.updatePlayStatus(0);
     },
 
     renderPlayButton() {
