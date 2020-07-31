@@ -168,7 +168,8 @@ body .container-main nav {
         text-decoration: underline; }
     body .container-main nav .navigation .menu .menu-logo {
       width: 400px;
-      max-width: 60%; }
+      max-width: 60%;
+      padding-bottom: 50px; }
       body .container-main nav .navigation .menu .menu-logo img {
         width: 100%; }
 
