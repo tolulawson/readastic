@@ -356,6 +356,20 @@ $(() => {
     },
   };
 
+  const featureButtonsView = {
+    init() {
+      $('.feature-link').click(function clickFeature(event) {
+        event.preventDefault();
+        $('#menu').prop('checked', false);
+        if (this.hash) {
+          $(this.hash)[0].scrollIntoView({
+            behavior: 'smooth',
+          });
+        }
+      });
+    },
+  };
+
   const controller = {
     init() {
       model.init();
@@ -367,6 +381,7 @@ $(() => {
       playWidgetView.init();
       wpmValueView.init();
       menuView.init();
+      featureButtonsView.init();
     },
 
     renderWPMValue() {

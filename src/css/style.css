@@ -256,7 +256,7 @@ body .container-main .features {
         color: #777777;
         margin-bottom: 15px;
         height: 20%; }
-      body .container-main .features .cards .feature-card button {
+      body .container-main .features .cards .feature-card .link-button {
         width: 90%;
         height: 50px;
         border-radius: 15px;
@@ -265,7 +265,9 @@ body .container-main .features {
         font-family: "Merriweather", serif;
         font-size: 1rem;
         text-align: center;
-        color: #777777; }
+        color: #777777;
+        text-decoration: none;
+        line-height: 50px; }
       body .container-main .features .cards .feature-card#ranger {
         background-color: #BBE1FA; }
       body .container-main .features .cards .feature-card#genie {
