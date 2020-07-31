@@ -13,7 +13,7 @@ $(() => {
   const model = {
     init() {
       this.wordCount = 0;
-      this.WPM = 150;
+      this.WPM = 125;
       this.textContent = '';
       this.playStatus = 0;
     },
