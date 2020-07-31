@@ -386,7 +386,9 @@ body {
             text-align: center;
             color: $gray;
             text-decoration: none;
-            line-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
 
           }
 
@@ -661,6 +663,7 @@ body {
       font-family: $lora;
       font-size: 1.5rem;
       padding: 50px 0;
+      width: 90%;
 
       strong {
         font-weight: 700;
@@ -869,4 +872,44 @@ body {
 
 strong {
   font-weight: bold;
+}
+
+@media screen and (max-width: 650px) {
+  body .container-main .features .cards .feature-card {
+    width: 90%;
+    max-width: 350px;
+    min-height: 200px;
+
+    h3 {
+      font-size: 1.8rem;
+    }
+
+    h5 {
+      font-size: 1.4rem;
+    }
+
+    .link-button {
+      font-size: 1.2rem;
+    }
+  }
+
+  body .container-main .hero {
+    flex-direction: column-reverse;
+
+    .hero-image {
+      max-width: 90%;
+      align-self: flex-end;
+      margin-top: -320px;
+    }
+
+    .hero-text {
+      max-width: 90%;
+      text-align: center;
+
+      h1 {
+        font-size: 3rem;
+        margin-top: 30px;
+      }
+    }
+  }
 }

@@ -267,7 +267,9 @@ body .container-main .features {
         text-align: center;
         color: #777777;
         text-decoration: none;
-        line-height: 50px; }
+        display: flex;
+        align-items: center;
+        justify-content: center; }
       body .container-main .features .cards .feature-card#ranger {
         background-color: #BBE1FA; }
       body .container-main .features .cards .feature-card#genie {
@@ -433,7 +435,8 @@ body .container-main footer {
   text-align: center;
   font-family: "lora", serif;
   font-size: 1.5rem;
-  padding: 50px 0; }
+  padding: 50px 0;
+  width: 90%; }
   body .container-main footer strong {
     font-weight: 700; }
   body .container-main footer a {
@@ -592,3 +595,27 @@ body .container-main footer {
 
 strong {
   font-weight: bold; }
+
+@media screen and (max-width: 650px) {
+  body .container-main .features .cards .feature-card {
+    width: 90%;
+    max-width: 350px;
+    min-height: 200px; }
+    body .container-main .features .cards .feature-card h3 {
+      font-size: 1.8rem; }
+    body .container-main .features .cards .feature-card h5 {
+      font-size: 1.4rem; }
+    body .container-main .features .cards .feature-card .link-button {
+      font-size: 1.2rem; }
+  body .container-main .hero {
+    flex-direction: column-reverse; }
+    body .container-main .hero .hero-image {
+      max-width: 90%;
+      align-self: flex-end;
+      margin-top: -320px; }
+    body .container-main .hero .hero-text {
+      max-width: 90%;
+      text-align: center; }
+      body .container-main .hero .hero-text h1 {
+        font-size: 3rem;
+        margin-top: 30px; } }
