@@ -16,6 +16,11 @@ function promisifyStream(stream) {
   return new Promise((resolve) => stream.on('end', resolve));
 }
 
+gulp.task('copy', function() {
+  return gulp.src('src/favicon.ico')
+      .pipe(gulp.dest('dist'));
+})
+
 gulp.task('browserify', function() {
   return browserify('src/js/app.js', {sourceType: module})
     .bundle()
@@ -126,5 +131,5 @@ gulp.task('start', async function() {
 })
 
 gulp.task('build', async function() {
-  (gulp.series('sass', 'autoprefixer', 'cleancss', 'babel', 'browserify', 'uglify', 'htmlmin', 'image'))();
+  (gulp.series('sass', 'autoprefixer', 'cleancss', 'babel', 'browserify', 'uglify', 'htmlmin', 'image', 'copy'))();
 });
