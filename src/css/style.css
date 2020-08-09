@@ -437,7 +437,9 @@ body .container-main footer {
   font-family: "lora", serif;
   font-size: 1.5rem;
   padding: 50px 0;
-  width: 90%; }
+  width: 90%;
+  margin-left: auto;
+  margin-right: auto; }
   body .container-main footer strong {
     font-weight: 700; }
   body .container-main footer a {
