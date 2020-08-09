@@ -406,7 +406,7 @@ $(() => {
       playWidgetView.init();
       wpmValueView.init();
       menuView.init();
-      featureButtonsView.init();
+      // featureButtonsView.init();
       initializeFirebase();
     },
 
@@ -433,6 +433,10 @@ $(() => {
 
     renderReadTime() {
       readTimeView.render(controller.getReadTime());
+    },
+
+    getWordCount() {
+      return model.wordCount;
     },
 
     renderWordCount() {
@@ -547,7 +551,7 @@ $(() => {
                   .then((data) => {
                     const blob = new Blob([data], { type: 'audio/mpeg' });
                     const link = window.URL.createObjectURL(blob);
-                    resolve({ link, voiceList });
+                    resolve({ link, voiceList, blob });
                   })
                   .catch((err) => {
                     alert(err);
@@ -565,11 +569,35 @@ $(() => {
         controller.updatePlayStatus(1);
         controller.renderPlayWidget();
         controller.renderPlayButton();
-        controller.fetchAudio(voice)
-          .then((result) => {
-            $('#audio-source').attr('src', result.link);
 
-            menuView.render(result.link, result.voiceList);
+        const splitLongText = (text) => {
+          const splitBy = (text.length / this.getWordCount()) * 1000;
+          const splitText = [];
+
+          for (let i = 0; i < text.length; i += splitBy) {
+            splitText.push(text.slice(i, i + splitBy));
+          }
+          // console.log(splitText.map((item) => item.length));
+          return splitText;
+        };
+
+        const textArray = splitLongText(this.getTextContent());
+        const audioSources = [];
+        const promises = [];
+        for (let i = 0; i < textArray.length; i += 1) {
+          promises.push(controller.fetchAudio(voice, textArray[i]));
+        }
+        Promise.all(promises)
+          .then((results) => {
+            results.forEach((result) => {
+              audioSources.push(result.blob);
+            });
+
+            const concatAudioLink = window.URL.createObjectURL(new Blob(audioSources, { type: 'audio/mpeg' }));
+
+            $('#audio-source').attr('src', concatAudioLink);
+
+            menuView.render(concatAudioLink, results[0].voiceList);
             $('#audio')[0].load();
             $('#audio')[0].play()
               .then(() => {
@@ -578,6 +606,20 @@ $(() => {
                 controller.renderPlayWidget();
               });
           });
+
+        // controller.fetchAudio(voice)
+        //   .then((result) => {
+        //     $('#audio-source').attr('src', result.link);
+        //
+        //     menuView.render(result.link, result.voiceList);
+        //     $('#audio')[0].load();
+        //     $('#audio')[0].play()
+        //       .then(() => {
+        //         controller.updatePlayStatus(2);
+        //         controller.renderPlayButton();
+        //         controller.renderPlayWidget();
+        //       });
+        //   });
       } else if (model.playStatus === 2) {
         $('#audio')[0].pause();
         controller.updatePlayStatus(3);
