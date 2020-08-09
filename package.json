@@ -50,6 +50,7 @@
     "aos": "^2.3.4",
     "bootstrap": "^4.5.0",
     "datejs": "^1.0.0-rc3",
+    "firebase": "^7.17.2",
     "gulp-jasmine-browser": "^4.1.0",
     "humanize-duration": "^3.23.1",
     "jquery": "^3.5.1",

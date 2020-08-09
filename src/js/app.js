@@ -5,6 +5,31 @@ const humanizeDuration = require('humanize-duration');
 const xmlbuilder = require('xmlbuilder');
 require('datejs');
 require('jquery-contextmenu');
+const firebase = require('firebase/app');
+require('firebase/firestore');
+
+let azureKey = '';
+
+const initializeFirebase = () => {
+  firebase.initializeApp({
+    apiKey: 'AIzaSyA4Q_VjmoThK_gIdecNb6iZAZ1EvcwRoow',
+    authDomain: 'apis-51900.firebaseapp.com',
+    projectId: 'apis-51900',
+  });
+
+  const db = firebase.firestore();
+
+  db.collection('api-keys').doc('api-keys-document')
+    .get()
+    .then((doc) => {
+      if (doc.exists) {
+        azureKey = doc.data().azure;
+      }
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+};
 
 global.$ = $;
 
@@ -382,6 +407,7 @@ $(() => {
       wpmValueView.init();
       menuView.init();
       featureButtonsView.init();
+      initializeFirebase();
     },
 
     renderWPMValue() {
@@ -476,7 +502,7 @@ $(() => {
           method: 'POST',
           headers: {
             'Content-type': 'application/x-www-form-urlencoded',
-            'Ocp-Apim-Subscription-Key': 'a89fff92801d4020930577013ee47618',
+            'Ocp-Apim-Subscription-Key': azureKey,
           },
           success: (token) => {
             $.ajax({
