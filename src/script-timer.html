@@ -3,11 +3,7 @@
 
 <head>
   <meta charset="utf-8">
-  <meta property="og:image" content="https://readastic.netlify.app/img/social-image.jpg">
-  <meta property="og:title" content="Readastic - Reading, transformed">
-  <meta property="og:description" content="Supercharge your reading experience with powerful tools and utilities.">
-  <meta property="og:type" content="app">
-  <meta property="og:url" content="https://readastic.com/">
+  <meta property="og:image" content="https://readastic.netlify.app/img/social-image.jpg"><meta property="og:title" content="Readastic - Reading, transformed"><meta property="og:description" content="Supercharge your reading experience with powerful tools and utilities."><meta property="og:type" content="app"><meta property="og:url" content="https://readastic.com/">
   <meta name="description" content="Enter the script or the number of words in your speech or presentation and you can calculate the length of time to read or deliver.">
   <title>Readastic - Reading, transformed</title>
   <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
@@ -25,14 +21,14 @@
     <nav>
       <div class="logo">
         <a href="/">
-          <img src="img/logo.svg" alt="Readastic logo">
-        </a>
+        <img src="img/logo.svg" alt="Readastic logo">
+      </a>
       </div>
 
       <div class="navigation">
         <input type="checkbox" name="menu-check" value="" id="menu">
         <label for="menu" class="menu-button">
-          <span class="hamburger" id="hamburger-1"></span>
+          <span  class="hamburger" id="hamburger-1"></span>
           <span class="hamburger" id="hamburger-2"></span>
         </label>
         <div class="menu">
@@ -49,7 +45,7 @@
 
       </div>
     </nav>
-    <div class="hero">
+    <!-- <div class="hero">
       <div class="hero-text">
         <h1>Supercharge your reading</h1>
         <h3><strong>Readastic</strong> provides tools that help you you decide and enjoy your next great read.</h3>
@@ -78,42 +74,38 @@
           <img src="img/timer-icon.svg" alt="Script timer logo">
           <h3>Script Timer</h3>
           <h5>Measure how long it takes to read a script at different read speeds.</h5>
-          <a href="script-timer.html" class="feature-link link-button">Get started</a>
+          <a href="#script-timer" class="feature-link link-button">Get started</a>
         </div>
       </div>
 
-    </section>
+    </section> -->
 
-    <!-- <section class="feature-section" id="script-timer">
+    <section class="feature-section" id="script-timer">
       <div class="feature-logo">
         <img src="img/timer-logo.svg" alt="Script timer logo">
+        <!-- <span>Script Timer</span> -->
       </div>
-
       <div class="feature-intro">
         Measure how long it takes to read a script at different read speeds.
       </div>
-
       <div class="text-area">
         <textarea name="name" class="script-input" placeholder="Paste the text of your script or
-      enter the number of words." id="text-area"></textarea>
+  enter the number of words." id="text-area"></textarea>
 
-        <div class="count-and-play">
+      <div class="count-and-play">
           <div class="play-script">
             <button type="button" name="button" id="play-button" class="" disabled></button>
 
             <span class="play-message">Listen to audio</span>
             <audio id='audio'>
               <source id="audio-source" type="audio/mpeg">
-              Your browser does not support the audio element.
+            Your browser does not support the audio element.
             </audio>
 
             <div class="play-widget hidden">
 
               <div class="lds-ellipsis load-animation">
-                <div></div>
-                <div></div>
-                <div></div>
-                <div></div>
+                <div></div><div></div><div></div><div></div>
               </div>
 
               <div class="play-indicator">
@@ -137,18 +129,18 @@
                 </div>
 
               </div>
-            </div>
 
+
+            </div>
           </div>
 
           <div class="word-count hidden">
             <span id="word-count"></span> word<span class='count-plural'></span>
-          </div>
 
+          </div>
           <div class="text-input-error hidden">
             Enter a valid number or paste your script
           </div>
-
         </div>
       </div>
 
@@ -175,9 +167,7 @@
               </label>
 
               <div class="pop-up" id="pop-up">
-                <label for="pop-up-check">
-                  <div type="button" name="button"></div>
-                </label>
+                <label for="pop-up-check"><div type="button" name="button"></div></label>
 
                 <p>
                   Loading.io's CSS spinner uses CSS Animation, which is wildly supported by all modern browsers such as Google Chrome and Mozilla Firefox. However, Microsoft Internet Explorer version earlier than 10 don't support CSS Animation.
@@ -190,7 +180,9 @@
         </div>
 
       </div>
-    </section> -->
+
+
+    </section>
 
     <footer>
       <p>
@@ -203,7 +195,7 @@
     </footer>
   </div>
 
-  <!-- <script type="text/javascript" src="js/bundle.js"></script> -->
+  <script type="text/javascript" src="js/bundle.js"></script>
 </body>
 
 </html>
