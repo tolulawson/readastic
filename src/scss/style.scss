@@ -4,6 +4,7 @@ $dark-green: #2980b9;
 $menu-blue: #D9EEFD;
 $lora: 'lora', serif;
 $merriweather: 'Merriweather', serif;
+$lato: 'Lato', sans-serif;
 $gen-padding: 20px 8%;
 $gray: #777777;
 $timer-color: #97E5EF;
@@ -425,11 +426,13 @@ body {
         flex-wrap: nowrap;
         justify-content: center;
         align-items: flex-end;
-        margin-bottom: 30px;
-        max-width: 350px;
+        margin-bottom: 20px;
+        margin-top: 60px;
+        max-width: 300px;
 
         img {
           width: 90%;
+          max-height: 95px;
 
         }
         //
@@ -446,14 +449,64 @@ body {
       .feature-intro {
         color: $gray;
         font-family: $lora;
-        font-size: 1.5rem;
-        margin-bottom: 50px;
+        font-size: 1.2rem;
+        margin-bottom: 30px;
         width: 90%;
       }
 
       .text-area {
         max-width: 600px;
         width: 90%;
+
+        .input-source-selection {
+          display: flex;
+          justify-content: center;
+          width: 100%;
+          padding: 0 3%;
+          margin-left: auto;
+          margin-right: auto;
+          font-family: $merriweather;
+          font-size: 1rem;
+          color: $gray;
+          border-radius: 10px 10px 0 0;
+          background-color: #fff;
+          border: 1px solid #d1cece;
+          border-bottom: 0;
+
+          .link-source {
+            width: 50%;
+            max-width: 200px;
+            position: relative;
+
+            label {
+              width: 100%;
+              padding: 10px 0;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              cursor: pointer;
+              font-size: 0.9rem;
+              font-weight: 400;
+              font-family: $lato;
+
+              &:hover {
+                background-color: #ddd;
+              }
+            }
+
+            .source-selector-radio {
+              opacity: 0;
+              width: 0.1px;
+              height: 0.1px;
+              position: absolute;
+
+              &:checked + label {
+                border-bottom: 3px solid $dark-green;
+              }
+            }
+
+          }
+        }
 
         .script-input {
           width: 100%;
@@ -463,7 +516,6 @@ body {
           border: 1px solid #d1cece;
           border-radius: 10px;
           padding: 15px;
-          // outline: none;
           box-shadow: none;
           resize: none;
 
@@ -471,6 +523,31 @@ body {
             text-align: center;
             padding-top: 90px;
             color: #A0A0A0;
+            transition: padding 0.2s ease;
+          }
+// --> Begin article reader styles
+
+          &.article-reader {
+            border-radius: 0 0 10px 10px;
+            border-top: 0;
+            transition: height 0.2s ease;
+            font-size: 0.9rem;
+
+            &.link {
+              height: 65px;
+
+              &::placeholder {
+                padding: 8px;
+              }
+            }
+
+            &.text {
+              height: 150px;
+
+              &::placeholder {
+                padding: 40px;
+              }
+            }
           }
         }
       }
@@ -481,6 +558,8 @@ body {
         align-items: center;
         margin-top: 10px;
 
+
+
         .play-script {
           display: flex;
           align-items: center;
@@ -488,7 +567,7 @@ body {
           flex-wrap: nowrap;
           font-family: $lora;
           color: $gray;
-          width: 60%;
+          width: 50%;
           max-width: 300px;
 
 
@@ -602,6 +681,49 @@ body {
           font-size: 0.8rem;
           font-family: $lora;
         }
+
+// <-- Article reader style begins -->
+        &.article-reader {
+          justify-content: center;
+
+          .play-script {
+            width: auto;
+            max-width: 600px;
+            justify-content: center;
+
+            &.playing {
+              width: 90%;
+            }
+
+            #play-button {
+              margin-right: 10px;
+              flex-shrink: 0;
+              // margin-top: 10px;
+            }
+          }
+
+          .play-widget {
+
+            .play-indicator {
+
+              .range-selector {
+                flex-direction: row;
+                padding-top: 0;
+                align-items: center;
+
+                #progress-bar {
+                  flex-shrink: 1;
+                }
+
+                .play-time {
+                  flex-shrink: 0;
+                  margin-left: 15px;
+                  margin-top: 0;
+                }
+              }
+            }
+          }
+        }
       }
 
       .read-time {
@@ -655,6 +777,28 @@ body {
       }
 
       &#script-timer {
+      }
+
+      .article-content {
+        font-family: $lora;
+        color: $gray;
+        font-size: 0.8rem;
+        text-align: left;
+        // width: 90%;
+        margin: 30px auto 0;
+        max-height: 180px;
+        overflow-y: scroll;
+        overflow-x: hidden;
+        text-overflow: ellipsis;
+        box-shadow: 0px 12px 48px rgba(109,117,141,0.2);
+        padding: 20px;
+        border-radius: 10px;
+        background-color: rgba(255,255,255,0.23);
+
+        .article-heading {
+          font-size: 1.2rem;
+          margin-bottom: 8px;
+        }
       }
     }
 
@@ -776,6 +920,7 @@ body {
     background: $dark-green;
     cursor: pointer;
     margin-top: -6px; /* You need to specify a margin in Chrome, but in Firefox and IE it is automatic */
+    border: none;
   }
 
   /* All the same stuff for Firefox */
@@ -804,10 +949,12 @@ body {
     cursor: pointer;
     background: $dark-green;
     border-radius: 7px;
+    border: none;
   }
 
   input[type=range]:focus::-webkit-slider-runnable-track {
     background: $dark-green;
+    border: none;
   }
 
   input[type=range]::-moz-range-track {
@@ -816,6 +963,7 @@ body {
     cursor: pointer;
     background: $dark-green;
     border-radius: 7px;
+    border: none;
   }
 
   input[type=range]::-ms-track {
@@ -832,6 +980,7 @@ body {
   }
   input[type=range]:focus::-ms-fill-lower {
     background: $dark-green;
+    border: none;
   }
   input[type=range]::-ms-fill-upper {
     background: $dark-green;
@@ -840,6 +989,7 @@ body {
   }
   input[type=range]:focus::-ms-fill-upper {
     background: $dark-green;
+    border: none;
   }
 
 }
