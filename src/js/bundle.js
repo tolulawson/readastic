@@ -46036,28 +46036,6 @@ const isURL = require('is-url');
 let azureKey = '';
 let aylienKey = '';
 
-const initializeFirebase = () => {
-  firebase.initializeApp({
-    apiKey: 'AIzaSyA4Q_VjmoThK_gIdecNb6iZAZ1EvcwRoow',
-    authDomain: 'apis-51900.firebaseapp.com',
-    projectId: 'apis-51900',
-  });
-
-  const db = firebase.firestore();
-
-  db.collection('api-keys').doc('api-keys-document')
-    .get()
-    .then((doc) => {
-      if (doc.exists) {
-        azureKey = doc.data().azure;
-        aylienKey = doc.data().aylien;
-      }
-    })
-    .catch((error) => {
-      console.log(error);
-    });
-};
-
 const getWordCountFromScript = (script) => {
   const regex = /\b(\w+)\b/g;
   if (script.match(regex)) {
@@ -46116,6 +46094,29 @@ $(() => {
     },
   };
 
+  const initializeFirebase = () => {
+    firebase.initializeApp({
+      apiKey: 'AIzaSyA4Q_VjmoThK_gIdecNb6iZAZ1EvcwRoow',
+      authDomain: 'apis-51900.firebaseapp.com',
+      projectId: 'apis-51900',
+    });
+
+    const db = firebase.firestore();
+
+    db.collection('api-keys').doc('api-keys-document')
+      .get()
+      .then((doc) => {
+        if (doc.exists) {
+          azureKey = doc.data().azure;
+          aylienKey = doc.data().aylien;
+          playFromURLParam();
+        }
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+  };
+
   const textAreaView = {
     init() {
       this.textContent = '';
@@ -46170,6 +46171,19 @@ $(() => {
       $('#text-area').on('paste', onPaste);
 
       $('#text-area').on('keyup', onKeyup);
+    },
+
+    onLoadWithParam() {
+      function getTextContent() {
+        return $('#text-area').val();
+      }
+
+      // setTimeout(() => {
+        textAreaView.textContent = getTextContent();
+
+        textAreaView.wordCount = getWordCountFromScript(textAreaView.textContent);
+        controller.textAreaChanged();
+      // }, 0);
     },
   };
 
@@ -46488,6 +46502,15 @@ $(() => {
     },
   };
 
+  const playFromURLParam = () => {
+    const url = new URL(window.location.href).searchParams.get('url');
+    if (url.length && $('.input-source-selection').length) {
+      $('#text-area').val(url);
+      textAreaView.onLoadWithParam();
+      playButtonView.playButton.click();
+    }
+  };
+
   const controller = {
     init() {
       model.init();
@@ -46721,7 +46744,6 @@ $(() => {
                 const text = response.article;
                 controller.storeArticleText(response);
                 processTextAndGetAudio(text);
-                console.log(text);
               });
           } else {
             window.alert('Enter a valid URL');
@@ -46731,7 +46753,6 @@ $(() => {
         } else {
           const text = this.getTextContent();
           processTextAndGetAudio(text);
-          console.log(text);
         }
 
         // controller.fetchAudio(voice)
