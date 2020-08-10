@@ -70,6 +70,15 @@ $(() => {
     },
   };
 
+  const playFromURLParam = () => {
+    const url = new URL(window.location.href).searchParams.get('url');
+    if (url && url.length && $('.input-source-selection').length) {
+      $('#text-area').val(url);
+      textAreaView.onLoadWithParam();
+      playButtonView.playButton.click();
+    }
+  };
+
   const initializeFirebase = () => {
     firebase.initializeApp({
       apiKey: 'AIzaSyA4Q_VjmoThK_gIdecNb6iZAZ1EvcwRoow',
@@ -176,7 +185,7 @@ $(() => {
           return controller.getWPMValue() / wpmRangeView.starterWPM;
         }
         controller.wpmUpdated($(this).val());
-        playWidgetView.audio[0].playbackRate = calcAudioPlayRate();
+        controller.updatePlaybackSpeed(calcAudioPlayRate());
       }
 
       $('#wpm-selector').on('input', onWPMRangeSlide);
@@ -432,6 +441,42 @@ $(() => {
         },
       };
 
+      if ($('.input-source-selection').length) {
+        menuObject.items.speed = {
+          name: 'Playback speed',
+          items: {
+            one: {
+              name: '<span class="speed">0.5x</span>',
+              isHtmlName: true,
+            },
+            two: {
+              name: '<span class="speed">0.75x</span>',
+              isHtmlName: true,
+            },
+            three: {
+              name: '<span class="speed selected">1.0x</span>',
+              isHtmlName: true,
+            },
+            four: {
+              name: '<span class="speed">1.25x</span>',
+              isHtmlName: true,
+            },
+            five: {
+              name: '<span class="speed">1.5x</span>',
+              isHtmlName: true,
+            },
+            six: {
+              name: '<span class="speed">1.75x</span>',
+              isHtmlName: true,
+            },
+            seven: {
+              name: '<span class="speed">2.0x</span>',
+              isHtmlName: true,
+            },
+          },
+        };
+      }
+
       voiceList.forEach((voice) => {
         menuObject.items.voices.items[voice.displayName] = {
           name: `<span data-voiceName="${voice.name}" class="voice ${voice.displayName === 'Mia' ? 'selected' : ''}"><strong>${voice.displayName}</strong> (${voice.locale}, ${voice.gender})`,
@@ -446,6 +491,14 @@ $(() => {
         controller.playAudio($(this).attr('data-voiceName'));
         $('.voice').removeClass('selected');
         $(this).addClass('selected');
+        $('#option-button').contextMenu('hide');
+      });
+
+      $('.speed').closest('li').click(function adjustSpeed() {
+        // this = $(this).find('.speed');
+        controller.updatePlaybackSpeed(Number($(this).find('.speed').text().replace('x', '')));
+        $('.speed').removeClass('selected');
+        $(this).find('.speed').addClass('selected');
         $('#option-button').contextMenu('hide');
       });
     },
@@ -476,15 +529,6 @@ $(() => {
         $('.article-content').addClass('hidden');
       }
     },
-  };
-
-  const playFromURLParam = () => {
-    const url = new URL(window.location.href).searchParams.get('url');
-    if (url.length && $('.input-source-selection').length) {
-      $('#text-area').val(url);
-      textAreaView.onLoadWithParam();
-      playButtonView.playButton.click();
-    }
   };
 
   const controller = {
@@ -595,6 +639,10 @@ $(() => {
         heading: article.title,
         body: article.article,
       };
+    },
+
+    updatePlaybackSpeed(speed) {
+      playWidgetView.audio[0].playbackRate = speed;
     },
 
     fetchAudio(voice = 'Microsoft Server Speech Text to Speech Voice (en-GB, MiaNeural)', text = this.getTextContent()) {
