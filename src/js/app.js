@@ -7,8 +7,10 @@ require('datejs');
 require('jquery-contextmenu');
 const firebase = require('firebase/app');
 require('firebase/firestore');
+const isURL = require('is-url');
 
 let azureKey = '';
+let aylienKey = '';
 
 const initializeFirebase = () => {
   firebase.initializeApp({
@@ -24,12 +26,46 @@ const initializeFirebase = () => {
     .then((doc) => {
       if (doc.exists) {
         azureKey = doc.data().azure;
+        aylienKey = doc.data().aylien;
       }
     })
     .catch((error) => {
       console.log(error);
     });
 };
+
+const getWordCountFromScript = (script) => {
+  const regex = /\b(\w+)\b/g;
+  if (script.match(regex)) {
+    return script.match(regex).length;
+  }
+  return 0;
+};
+
+const fetchArticleBody = (url) => new Promise((resolve) => {
+  const settings = {
+    async: true,
+    crossDomain: true,
+    url: 'https://aylien-text.p.rapidapi.com/extract',
+    method: 'GET',
+    headers: {
+      'x-rapidapi-host': 'aylien-text.p.rapidapi.com',
+      'x-rapidapi-key': aylienKey,
+    },
+    data: {
+      url,
+    },
+  };
+
+  if (aylienKey) {
+    $.ajax(settings)
+      .done((response) => {
+        resolve(response);
+      });
+  } else {
+    window.alert('There was an error processing your request. Please try again.');
+  }
+});
 
 global.$ = $;
 
@@ -41,6 +77,10 @@ $(() => {
       this.WPM = 125;
       this.textContent = '';
       this.playStatus = 0;
+      this.fetchedArticle = {
+        heading: '',
+        body: '',
+      };
     },
 
     setScriptLength(length) {
@@ -56,18 +96,30 @@ $(() => {
     init() {
       this.textContent = '';
       this.wordCount = 0;
+      this.textSourceSelector = $('.source-selector-radio');
+
+      function onTextSourceChange() {
+        if ($('.input-source-selection').length) {
+          if ($('.input-source-selection').serializeArray()[0].value === 'link') {
+            $('#text-area')
+              .removeClass('text')
+              .addClass('link')
+              .val('')
+              .attr('placeholder', 'Enter a link to your article');
+          } else if ($('.input-source-selection').serializeArray()[0].value === 'text') {
+            $('#text-area')
+              .removeClass('link')
+              .addClass('text').val('')
+              .attr('placeholder', 'Enter article text');
+          }
+        }
+      }
+
+      this.textSourceSelector.change(onTextSourceChange);
 
       function onPaste() {
         function getTextContent() {
           return $('#text-area').val();
-        }
-
-        function getWordCountFromScript(script) {
-          const regex = /\b(\w+)\b/g;
-          if (script.match(regex)) {
-            return script.match(regex).length;
-          }
-          return 0;
         }
 
         setTimeout(() => {
@@ -231,6 +283,7 @@ $(() => {
       this.player = $('.play-indicator');
       this.progressBar = $('#progress-bar');
       this.menu = $('.audio-menu');
+      this.playScript = $('.play-script');
       this.statuses = {
         none: 0,
         loading: 1,
@@ -292,14 +345,17 @@ $(() => {
         this.loadIndicator.addClass('hidden');
         this.player.addClass('hidden');
         this.menu.addClass('hidden');
+        this.playScript.removeClass('playing');
       } else if (status === this.statuses.loading) {
         this.playWidget.removeClass('hidden');
         this.loadIndicator.removeClass('hidden');
+        this.playScript.removeClass('playing');
       } else if (status === this.statuses.playing) {
         this.playWidget.removeClass('hidden');
         this.loadIndicator.addClass('hidden');
         this.player.removeClass('hidden');
         this.menu.removeClass('hidden');
+        this.playScript.addClass('playing');
       }
     },
 
@@ -381,17 +437,30 @@ $(() => {
     },
   };
 
-  const featureButtonsView = {
-    init() {
-      $('.feature-link').click(function clickFeature(event) {
-        event.preventDefault();
-        $('#menu').prop('checked', false);
-        if (this.hash) {
-          $(this.hash)[0].scrollIntoView({
-            behavior: 'smooth',
-          });
-        }
-      });
+  // const featureButtonsView = {
+  //   init() {
+  //     $('.feature-link').click(function clickFeature(event) {
+  //       event.preventDefault();
+  //       $('#menu').prop('checked', false);
+  //       if (this.hash) {
+  //         $(this.hash)[0].scrollIntoView({
+  //           behavior: 'smooth',
+  //         });
+  //       }
+  //     });
+  //   },
+  // };
+
+  const fetchedArticleView = {
+    render(article) {
+      $('.article-heading').text(article.heading);
+      $('.article-body').text(article.body);
+
+      if (article.heading || article.body) {
+        $('.article-content').removeClass('hidden');
+      } else {
+        $('.article-content').addClass('hidden');
+      }
     },
   };
 
@@ -406,7 +475,6 @@ $(() => {
       playWidgetView.init();
       wpmValueView.init();
       menuView.init();
-      // featureButtonsView.init();
       initializeFirebase();
     },
 
@@ -499,6 +567,13 @@ $(() => {
       controller.renderPlayButton();
     },
 
+    storeArticleText(article) {
+      model.fetchedArticle = {
+        heading: article.title,
+        body: article.article,
+      };
+    },
+
     fetchAudio(voice = 'Microsoft Server Speech Text to Speech Voice (en-GB, MiaNeural)', text = this.getTextContent()) {
       return new Promise((resolve) => {
         $.ajax({
@@ -569,43 +644,71 @@ $(() => {
         controller.updatePlayStatus(1);
         controller.renderPlayWidget();
         controller.renderPlayButton();
+        fetchedArticleView.render({
+          heading: '',
+          body: '',
+        });
 
-        const splitLongText = (text) => {
-          const splitBy = (text.length / this.getWordCount()) * 1000;
-          const splitText = [];
+        // let text = '';
 
-          for (let i = 0; i < text.length; i += splitBy) {
-            splitText.push(text.slice(i, i + splitBy));
+        const processTextAndGetAudio = (text) => {
+          const splitLongText = () => {
+            const splitBy = (text.length / getWordCountFromScript(text)) * 1000;
+            const splitText = [];
+
+            for (let i = 0; i < text.length; i += splitBy) {
+              splitText.push(text.slice(i, i + splitBy));
+            }
+            return splitText;
+          };
+
+          const textArray = splitLongText();
+          const audioSources = [];
+          const promises = [];
+          for (let i = 0; i < textArray.length; i += 1) {
+            promises.push(controller.fetchAudio(voice, textArray[i]));
           }
-          // console.log(splitText.map((item) => item.length));
-          return splitText;
+          Promise.all(promises)
+            .then((results) => {
+              results.forEach((result) => {
+                audioSources.push(result.blob);
+              });
+
+              const concatAudioLink = window.URL.createObjectURL(new Blob(audioSources, { type: 'audio/mpeg' }));
+
+              $('#audio-source').attr('src', concatAudioLink);
+
+              menuView.render(concatAudioLink, results[0].voiceList);
+              $('#audio')[0].load();
+              $('#audio')[0].play()
+                .then(() => {
+                  controller.updatePlayStatus(2);
+                  controller.renderPlayButton();
+                  controller.renderPlayWidget();
+                  fetchedArticleView.render(model.fetchedArticle);
+                });
+            });
         };
 
-        const textArray = splitLongText(this.getTextContent());
-        const audioSources = [];
-        const promises = [];
-        for (let i = 0; i < textArray.length; i += 1) {
-          promises.push(controller.fetchAudio(voice, textArray[i]));
-        }
-        Promise.all(promises)
-          .then((results) => {
-            results.forEach((result) => {
-              audioSources.push(result.blob);
-            });
-
-            const concatAudioLink = window.URL.createObjectURL(new Blob(audioSources, { type: 'audio/mpeg' }));
-
-            $('#audio-source').attr('src', concatAudioLink);
-
-            menuView.render(concatAudioLink, results[0].voiceList);
-            $('#audio')[0].load();
-            $('#audio')[0].play()
-              .then(() => {
-                controller.updatePlayStatus(2);
-                controller.renderPlayButton();
-                controller.renderPlayWidget();
+        if ($('.input-source-selection').length && $('.input-source-selection').serializeArray()[0].value === 'link') {
+          if (isURL(controller.getTextContent())) {
+            fetchArticleBody(controller.getTextContent())
+              .then((response) => {
+                const text = response.article;
+                controller.storeArticleText(response);
+                processTextAndGetAudio(text);
+                console.log(text);
               });
-          });
+          } else {
+            window.alert('Enter a valid URL');
+            controller.updatePlayStatus(0);
+            controller.renderPlayButton();
+          }
+        } else {
+          const text = this.getTextContent();
+          processTextAndGetAudio(text);
+          console.log(text);
+        }
 
         // controller.fetchAudio(voice)
         //   .then((result) => {
