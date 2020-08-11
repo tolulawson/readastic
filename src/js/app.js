@@ -434,7 +434,7 @@ $(() => {
             icon: 'download',
           },
           voices: {
-            name: 'Change voice',
+            name: 'Change Voice',
             items: {
             },
           },
@@ -443,7 +443,7 @@ $(() => {
 
       if ($('.input-source-selection').length) {
         menuObject.items.speed = {
-          name: 'Playback speed',
+          name: 'Playback Speed',
           items: {
             one: {
               name: '<span class="speed">0.5x</span>',
@@ -533,6 +533,7 @@ $(() => {
 
   const controller = {
     init() {
+      this.windowClosed();
       model.init();
       textAreaView.init();
       wpmRangeView.init();
@@ -543,6 +544,16 @@ $(() => {
       wpmValueView.init();
       menuView.init();
       initializeFirebase();
+    },
+
+    windowClosed() {
+      window.onbeforeunload = (e) => {
+        if (e && this.getPlayStatus() !== 0) {
+          e.returnValue = 'Sure?';
+        }
+        // For Safari
+        // return 'Sure?';
+      };
     },
 
     renderWPMValue() {
