@@ -46360,7 +46360,7 @@ $(() => {
           controller.updatePlayStatus(2);
         },
         pause: () => {
-          // controller.updatePlayStatus(3);
+          controller.updatePlayStatus(3);
         },
         ended: () => {
           controller.updatePlayStatus(3);
@@ -46558,6 +46558,7 @@ $(() => {
   const controller = {
     init() {
       this.windowClosed();
+      this.navMenuClose();
       model.init();
       textAreaView.init();
       wpmRangeView.init();
@@ -46578,6 +46579,14 @@ $(() => {
         // For Safari
         // return 'Sure?';
       };
+    },
+
+    navMenuClose() {
+      $(document).click((event) => {
+        if (!$(event.target).closest('.navigation').length) {
+          $('#menu').prop('checked', false);
+        }
+      });
     },
 
     renderWPMValue() {
