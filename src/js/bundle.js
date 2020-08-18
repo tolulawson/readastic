@@ -46099,7 +46099,21 @@ $(() => {
     if (url && url.length && $('.input-source-selection').length) {
       $('#text-area').val(url);
       textAreaView.onLoadWithParam();
-      playButtonView.playButton.click();
+
+      const iOS = () => [
+        'iPad Simulator',
+        'iPhone Simulator',
+        'iPod Simulator',
+        'iPad',
+        'iPhone',
+        'iPod',
+      ].includes(navigator.platform)
+      // iPad on iOS 13 detection
+      || (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
+
+      if (!iOS()) {
+        playButtonView.playButton.click();
+      }
     }
   };
 
@@ -46284,7 +46298,12 @@ $(() => {
       playButtonView.render();
 
       function onClick() {
-        controller.playAudio();
+        $('#audio')[0].muted = true;
+        $('#audio')[0].play()
+          .then(() => {
+            $('#audio')[0].muted = false;
+            controller.playAudio();
+          });
       }
 
       this.playButton.click(onClick);
@@ -46357,10 +46376,14 @@ $(() => {
 
       this.audio.on({
         play: () => {
-          controller.updatePlayStatus(2);
+          if ($('#audio-source')[0].src !== 'https://github.com/anars/blank-audio/raw/master/250-milliseconds-of-silence.mp3') {
+            controller.updatePlayStatus(2);
+          }
         },
         pause: () => {
-          controller.updatePlayStatus(3);
+          if ($('#audio-source')[0].src !== 'https://github.com/anars/blank-audio/raw/master/250-milliseconds-of-silence.mp3') {
+            controller.updatePlayStatus(3);
+          }
         },
         ended: () => {
           controller.updatePlayStatus(3);
@@ -46386,8 +46409,10 @@ $(() => {
 
     render(status) {
       if (status === this.statuses.none) {
-        this.audio.src = '';
-        this.audio[0].pause();
+        // this.audio.src = '';
+        if (this.audio.length) {
+          this.audio[0].pause();
+        }
         this.playWidget.addClass('hidden');
         this.loadIndicator.addClass('hidden');
         this.player.addClass('hidden');
@@ -46415,17 +46440,19 @@ $(() => {
       const info = $('#pop')[0];
       const tooltip = $('#pop-up')[0];
 
-      const pop = popper.createPopper(info, tooltip, {
-        placement: 'top',
-        modifiers: [
-          {
-            name: 'offset',
-            options: {
-              offset: [0, 8],
+      if(info && tooltip) {
+        const pop = popper.createPopper(info, tooltip, {
+          placement: 'top',
+          modifiers: [
+            {
+              name: 'offset',
+              options: {
+                offset: [0, 8],
+              },
             },
-          },
-        ],
-      });
+          ],
+        });
+      }
 
       $('#pop-up-check').change(function onCheck() {
         if (this.checked) {
@@ -46569,6 +46596,18 @@ $(() => {
       wpmValueView.init();
       menuView.init();
       initializeFirebase();
+      this.injectFooter();
+    },
+
+    injectFooter() {
+      const footer = `<p>
+        <strong>Readastic</strong> is built with ❤️ by <a href="https://twitter.com/tolulawson" target="_blank"><strong>Tolu Lawson</strong></a>
+      </p>
+      <p id="coffee">
+        Buy me a <a href="https://ko-fi.com/tolulawson"><strong>coffee</strong></a>
+      </p>`;
+
+      $('footer').html(footer);
     },
 
     windowClosed() {
@@ -46686,7 +46725,9 @@ $(() => {
     },
 
     updatePlaybackSpeed(speed) {
-      playWidgetView.audio[0].playbackRate = speed;
+      if(this.audio.length) {
+        playWidgetView.audio[0].playbackRate = speed;
+      }
     },
 
     fetchAudio(voice = 'Microsoft Server Speech Text to Speech Voice (en-GB, MiaNeural)', text = this.getTextContent()) {
@@ -46755,7 +46796,9 @@ $(() => {
 
     playAudio(voice) {
       if (model.playStatus === 0) {
-        $('#audio')[0].pause();
+        if ($('#audio').length) {
+          $('#audio')[0].pause();
+        }
         controller.updatePlayStatus(1);
         controller.renderPlayWidget();
         controller.renderPlayButton();
@@ -46794,14 +46837,16 @@ $(() => {
               $('#audio-source').attr('src', concatAudioLink);
 
               menuView.render(concatAudioLink, results[0].voiceList);
-              $('#audio')[0].load();
-              $('#audio')[0].play()
-                .then(() => {
-                  controller.updatePlayStatus(2);
-                  controller.renderPlayButton();
-                  controller.renderPlayWidget();
-                  fetchedArticleView.render(model.fetchedArticle);
-                });
+              if ($('#audio').length) {
+                $('#audio')[0].load();
+                $('#audio')[0].play()
+                  .then(() => {
+                    controller.updatePlayStatus(2);
+                    controller.renderPlayButton();
+                    controller.renderPlayWidget();
+                    fetchedArticleView.render(model.fetchedArticle);
+                  });
+              }
             });
         };
 
