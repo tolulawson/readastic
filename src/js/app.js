@@ -20,6 +20,17 @@ const getWordCountFromScript = (script) => {
   return 0;
 };
 
+const iOS = () => [
+  'iPad Simulator',
+  'iPhone Simulator',
+  'iPod Simulator',
+  'iPad',
+  'iPhone',
+  'iPod',
+].includes(navigator.platform)
+// iPad on iOS 13 detection
+|| (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
+
 const fetchArticleBody = (url) => new Promise((resolve) => {
   const settings = {
     async: true,
@@ -75,17 +86,6 @@ $(() => {
     if (url && url.length && $('.input-source-selection').length) {
       $('#text-area').val(url.trim());
       textAreaView.onLoadWithParam();
-
-      const iOS = () => [
-        'iPad Simulator',
-        'iPhone Simulator',
-        'iPod Simulator',
-        'iPad',
-        'iPhone',
-        'iPod',
-      ].includes(navigator.platform)
-      // iPad on iOS 13 detection
-      || (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
 
       if (!iOS()) {
         playButtonView.playButton.click();
@@ -274,11 +274,15 @@ $(() => {
       playButtonView.render();
 
       function onClick() {
-        if (!playWidgetView.notSampleAudio()) {
-          $('#audio')[0].play()
-            .then(() => {
-              controller.playAudio();
-            });
+        if (iOS()) {
+          if (!playWidgetView.notSampleAudio()) {
+            $('#audio')[0].play()
+              .then(() => {
+                controller.playAudio();
+              });
+          } else {
+            controller.playAudio();
+          }
         } else {
           controller.playAudio();
         }
@@ -799,7 +803,7 @@ $(() => {
 
         const processTextAndGetAudio = (text) => {
           const splitLongText = () => {
-            const splitBy = (text.length / getWordCountFromScript(text)) * 1000;
+            const splitBy = (text.length / getWordCountFromScript(text)) * 1500;
             const splitText = [];
 
             for (let i = 0; i < text.length; i += splitBy) {
