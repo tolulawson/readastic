@@ -361,7 +361,7 @@ body .container-main .feature-section {
         border-radius: 0 0 10px 10px;
         border-top: 0;
         transition: height 0.2s ease;
-        font-size: 0.9rem; }
+        font-size: 1rem; }
         body .container-main .feature-section .text-area .script-input.article-reader.link {
           height: 65px; }
           body .container-main .feature-section .text-area .script-input.article-reader.link::placeholder {
