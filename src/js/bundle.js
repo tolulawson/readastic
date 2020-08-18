@@ -46097,7 +46097,7 @@ $(() => {
   const playFromURLParam = () => {
     const url = new URL(window.location.href).searchParams.get('url');
     if (url && url.length && $('.input-source-selection').length) {
-      $('#text-area').val(url);
+      $('#text-area').val(url.trim());
       textAreaView.onLoadWithParam();
 
       const iOS = () => [
@@ -46298,12 +46298,14 @@ $(() => {
       playButtonView.render();
 
       function onClick() {
-        $('#audio')[0].muted = true;
-        $('#audio')[0].play()
-          .then(() => {
-            $('#audio')[0].muted = false;
-            controller.playAudio();
-          });
+        if (!playWidgetView.notSampleAudio()) {
+          $('#audio')[0].play()
+            .then(() => {
+              controller.playAudio();
+            });
+        } else {
+          controller.playAudio();
+        }
       }
 
       this.playButton.click(onClick);
@@ -46376,40 +46378,50 @@ $(() => {
 
       this.audio.on({
         play: () => {
-          if ($('#audio-source')[0].src !== 'https://github.com/anars/blank-audio/raw/master/250-milliseconds-of-silence.mp3') {
+          if (playWidgetView.notSampleAudio()) {
             controller.updatePlayStatus(2);
           }
         },
         pause: () => {
-          if ($('#audio-source')[0].src !== 'https://github.com/anars/blank-audio/raw/master/250-milliseconds-of-silence.mp3') {
+          if (playWidgetView.notSampleAudio()) {
             controller.updatePlayStatus(3);
           }
         },
         ended: () => {
-          controller.updatePlayStatus(3);
-          playWidgetView.audio[0].currentTime = 0;
+          if (playWidgetView.notSampleAudio()) {
+            controller.updatePlayStatus(3);
+            playWidgetView.audio[0].currentTime = 0;
+          }
         },
         timeupdate: function updateProgressBar() {
-          playWidgetView.progressBar.val(this.currentTime);
+          if (playWidgetView.notSampleAudio()) {
+            playWidgetView.progressBar.val(this.currentTime);
 
-          playWidgetView.elapsedTime.text(formattedTime(this.currentTime / this.playbackRate));
-          playWidgetView.totalTime.text(formattedTime(this.duration / this.playbackRate));
+            playWidgetView.elapsedTime.text(formattedTime(this.currentTime / this.playbackRate));
+            playWidgetView.totalTime.text(formattedTime(this.duration / this.playbackRate));
+          }
         },
         loadedmetadata: function setProgressBarMax() {
-          playWidgetView.progressBar.attr('max', this.duration);
-          wpmRangeView.starterWPM = getAudioWPM();
-          controller.wpmUpdated(getAudioWPM());
-          playWidgetView.elapsedTime.text(formattedTime(this.currentTime / this.playbackRate));
-          playWidgetView.totalTime.text(formattedTime(this.duration / this.playbackRate));
+          if (playWidgetView.notSampleAudio()) {
+            playWidgetView.progressBar.attr('max', this.duration);
+            wpmRangeView.starterWPM = getAudioWPM();
+            controller.wpmUpdated(getAudioWPM());
+            playWidgetView.elapsedTime.text(formattedTime(this.currentTime / this.playbackRate));
+            playWidgetView.totalTime.text(formattedTime(this.duration / this.playbackRate));
+          }
         },
       });
 
       playWidgetView.render(controller.getPlayStatus());
     },
 
+    notSampleAudio() {
+      return $('#audio-source')[0].src !== 'https://github.com/anars/blank-audio/raw/master/250-milliseconds-of-silence.mp3';
+    },
+
     render(status) {
       if (status === this.statuses.none) {
-        // this.audio.src = '';
+        this.audio.src = '';
         if (this.audio.length) {
           this.audio[0].pause();
         }
@@ -46796,7 +46808,7 @@ $(() => {
 
     playAudio(voice) {
       if (model.playStatus === 0) {
-        if ($('#audio').length) {
+        if ($('#audio').length && playWidgetView.notSampleAudio()) {
           $('#audio')[0].pause();
         }
         controller.updatePlayStatus(1);
