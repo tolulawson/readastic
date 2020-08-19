@@ -46119,28 +46119,30 @@ $(() => {
     }
   };
 
-  // const initializeFirebase = () => {
-  //   firebase.initializeApp({
-  //     apiKey: 'AIzaSyA4Q_VjmoThK_gIdecNb6iZAZ1EvcwRoow',
-  //     authDomain: 'apis-51900.firebaseapp.com',
-  //     projectId: 'apis-51900',
-  //   });
-  //
-  //   const db = firebase.firestore();
-  //
-  //   db.collection('api-keys').doc('api-keys-document')
-  //     .get()
-  //     .then((doc) => {
-  //       if (doc.exists) {
-  //         azureKey = doc.data().azure;
-  //         aylienKey = doc.data().aylien;
-  //         playFromURLParam();
-  //       }
-  //     })
-  //     .catch((error) => {
-  //       console.log(error);
-  //     });
-  // };
+  // const firebaseAPI = 'AIzaSyA4Q_VjmoThK_gIdecNb6iZAZ1EvcwRoow';
+
+  const initializeFirebase = () => {
+    firebase.initializeApp({
+      apiKey: firebaseAPI,
+      authDomain: 'apis-51900.firebaseapp.com',
+      projectId: 'apis-51900',
+    });
+
+    const db = firebase.firestore();
+
+    db.collection('api-keys').doc('api-keys-document')
+      .get()
+      .then((doc) => {
+        if (doc.exists) {
+          azureKey = doc.data().azure;
+          aylienKey = doc.data().aylien;
+          playFromURLParam();
+        }
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+  };
 
   const textAreaView = {
     init() {
