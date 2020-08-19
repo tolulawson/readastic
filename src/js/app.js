@@ -2,6 +2,7 @@ const popper = require('@popperjs/core');
 
 window.jQuery = require('jquery');
 
+const $ = window.jQuery;
 window.$ = window.jQuery;
 
 const humanizeDuration = require('humanize-duration');
@@ -59,8 +60,6 @@ const fetchArticleBody = (url) => new Promise((resolve) => {
     window.alert('There was an error processing your request. Please try again.');
   }
 });
-
-global.$ = $;
 
 //
 $(() => {
@@ -182,10 +181,10 @@ $(() => {
       }
 
       // setTimeout(() => {
-        textAreaView.textContent = getTextContent();
+      textAreaView.textContent = getTextContent();
 
-        textAreaView.wordCount = getWordCountFromScript(textAreaView.textContent);
-        controller.textAreaChanged();
+      textAreaView.wordCount = getWordCountFromScript(textAreaView.textContent);
+      controller.textAreaChanged();
       // }, 0);
     },
   };
