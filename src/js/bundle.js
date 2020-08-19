@@ -46021,11 +46021,11 @@ var __createBinding;
 }).call(this);
 
 },{"./NodeType":30,"./Utility":31,"./WriterState":32,"./XMLDOMImplementation":39,"./XMLDocument":47,"./XMLDocumentCB":48,"./XMLStreamWriter":56,"./XMLStringWriter":57}],62:[function(require,module,exports){
-(function (global){
 const popper = require('@popperjs/core');
 
 window.jQuery = require('jquery');
 
+const $ = window.jQuery;
 window.$ = window.jQuery;
 
 const humanizeDuration = require('humanize-duration');
@@ -46083,8 +46083,6 @@ const fetchArticleBody = (url) => new Promise((resolve) => {
     window.alert('There was an error processing your request. Please try again.');
   }
 });
-
-global.$ = $;
 
 //
 $(() => {
@@ -46206,10 +46204,10 @@ $(() => {
       }
 
       // setTimeout(() => {
-        textAreaView.textContent = getTextContent();
+      textAreaView.textContent = getTextContent();
 
-        textAreaView.wordCount = getWordCountFromScript(textAreaView.textContent);
-        controller.textAreaChanged();
+      textAreaView.wordCount = getWordCountFromScript(textAreaView.textContent);
+      controller.textAreaChanged();
       // }, 0);
     },
   };
@@ -46920,5 +46918,4 @@ $(() => {
   controller.init();
 });
 
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{"@popperjs/core":7,"datejs":8,"firebase/app":21,"firebase/firestore":22,"humanize-duration":23,"is-url":24,"jquery":26,"jquery-contextmenu":25,"xmlbuilder":61}]},{},[62]);
