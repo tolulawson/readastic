@@ -1,12 +1,16 @@
 const popper = require('@popperjs/core');
 
-const $ = require('jquery');
+window.jQuery = require('jquery');
+
+window.$ = window.jQuery;
+
 const humanizeDuration = require('humanize-duration');
 const xmlbuilder = require('xmlbuilder');
 require('datejs');
 require('jquery-contextmenu');
 const firebase = require('firebase/app');
 require('firebase/firestore');
+// require('jquery.ui.position');
 const isURL = require('is-url');
 
 let azureKey = '';
