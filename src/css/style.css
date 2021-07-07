@@ -229,8 +229,8 @@ body .container-main .features {
     flex-wrap: wrap;
     justify-content: space-around; }
     body .container-main .features .cards .feature-card {
-      width: 28%;
-      max-width: 300px;
+      width: 35%;
+      max-width: 400px;
       min-width: 200px;
       border-radius: 20px;
       display: flex;
