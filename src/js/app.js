@@ -10,7 +10,7 @@ const xmlbuilder = require('xmlbuilder');
 require('datejs');
 require('jquery-contextmenu');
 const isURL = require('is-url');
-const { azureKey, aylienKey } = require('./api_keys');
+const { azureKey, aylienKey } = require('../../app.config');
 
 const getWordCountFromScript = (script) => {
   const regex = /\b(\w+)\b/g;

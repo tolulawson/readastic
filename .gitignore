@@ -1,3 +1,7 @@
 node_modules/
 src/js/api_keys.js
 dist/
+.env.json
+.vscode/settings.json
+src/css/style.css
+app.config.js

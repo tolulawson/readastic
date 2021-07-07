@@ -11,10 +11,29 @@ const jasmineBrowser = require('gulp-jasmine-browser');
 const browserify = require('browserify');
 const source = require('vinyl-source-stream');
 const babelify = require('babelify');
+const env = require('gulp-env');
+const template = require('gulp-template');
+const rename = require('gulp-rename');
 
 function promisifyStream(stream) {
   return new Promise((resolve) => stream.on('end', resolve));
 }
+
+gulp.task('dev_env', function() {
+  env({
+    file: '.env',
+  });
+});
+
+gulp.task('config', function() {
+  return gulp.src('app.config.tmpl.js')
+    .pipe(template({
+      aylienKey: process.env.aylienKey,
+      azureKey: process.env.azureKey,
+    }))
+    .pipe(rename('app.config.js'))
+    .pipe(gulp.dest('./'));
+});
 
 gulp.task('copy', function() {
   return gulp.src('src/favicon.ico')
@@ -119,7 +138,7 @@ gulp.task('tests', async function() {
 });
 
 gulp.task('start', async function() {
-  // (gulp.series('browsersync'))();
+  (gulp.parallel('dev_env', 'config'))();
   browsersync.init({
       server:  {
         baseDir : "src"
@@ -131,5 +150,5 @@ gulp.task('start', async function() {
 })
 
 gulp.task('build', async function() {
-  (gulp.series('sass', 'autoprefixer', 'cleancss', 'babel', 'browserify', 'uglify', 'htmlmin', 'image', 'copy'))();
+  (gulp.series('sass', 'autoprefixer', 'cleancss', 'config', 'babel', 'browserify', 'uglify', 'htmlmin', 'image', 'copy'))();
 });

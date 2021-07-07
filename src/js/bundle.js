@@ -1,7 +1,13 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
-(function (process){
+module.exports = {
+  aylienKey: '0865acd424msh0e9b3b15f686f2cp1a5795jsna12cf4567171',
+  azureKey: 'c7803c77aa1445e588c4cc554e228ea6',
+};
+
+},{}],2:[function(require,module,exports){
+(function (process){(function (){
 /**
- * @popperjs/core v2.4.4 - MIT License
+ * @popperjs/core v2.9.2 - MIT License
  */
 
 'use strict';
@@ -22,13 +28,14 @@ function getBoundingClientRect(element) {
   };
 }
 
-/*:: import type { Window } from '../types'; */
-
-/*:: declare function getWindow(node: Node | Window): Window; */
 function getWindow(node) {
+  if (node == null) {
+    return window;
+  }
+
   if (node.toString() !== '[object Window]') {
     var ownerDocument = node.ownerDocument;
-    return ownerDocument ? ownerDocument.defaultView : window;
+    return ownerDocument ? ownerDocument.defaultView || window : window;
   }
 
   return node;
@@ -44,20 +51,24 @@ function getWindowScroll(node) {
   };
 }
 
-/*:: declare function isElement(node: mixed): boolean %checks(node instanceof
-  Element); */
-
 function isElement(node) {
   var OwnElement = getWindow(node).Element;
   return node instanceof OwnElement || node instanceof Element;
 }
-/*:: declare function isHTMLElement(node: mixed): boolean %checks(node instanceof
-  HTMLElement); */
-
 
 function isHTMLElement(node) {
   var OwnElement = getWindow(node).HTMLElement;
   return node instanceof OwnElement || node instanceof HTMLElement;
+}
+
+function isShadowRoot(node) {
+  // IE 11 has no ShadowRoot
+  if (typeof ShadowRoot === 'undefined') {
+    return false;
+  }
+
+  var OwnElement = getWindow(node).ShadowRoot;
+  return node instanceof OwnElement || node instanceof ShadowRoot;
 }
 
 function getHTMLElementScroll(element) {
@@ -80,8 +91,9 @@ function getNodeName(element) {
 }
 
 function getDocumentElement(element) {
-  // $FlowFixMe: assume body is always available
-  return (isElement(element) ? element.ownerDocument : element.document).documentElement;
+  // $FlowFixMe[incompatible-return]: assume body is always available
+  return ((isElement(element) ? element.ownerDocument : // $FlowFixMe[prop-missing]
+  element.document) || window.document).documentElement;
 }
 
 function getWindowScrollBarX(element) {
@@ -151,14 +163,28 @@ function getCompositeRect(elementOrVirtualElement, offsetParent, isFixed) {
   };
 }
 
-// Returns the layout rect of an element relative to its offsetParent. Layout
 // means it doesn't take into account transforms.
+
 function getLayoutRect(element) {
+  var clientRect = getBoundingClientRect(element); // Use the clientRect sizes if it's not been transformed.
+  // Fixes https://github.com/popperjs/popper-core/issues/1223
+
+  var width = element.offsetWidth;
+  var height = element.offsetHeight;
+
+  if (Math.abs(clientRect.width - width) <= 1) {
+    width = clientRect.width;
+  }
+
+  if (Math.abs(clientRect.height - height) <= 1) {
+    height = clientRect.height;
+  }
+
   return {
     x: element.offsetLeft,
     y: element.offsetTop,
-    width: element.offsetWidth,
-    height: element.offsetHeight
+    width: width,
+    height: height
   };
 }
 
@@ -167,12 +193,13 @@ function getParentNode(element) {
     return element;
   }
 
-  return (// $FlowFixMe: this is a quicker (but less type safe) way to save quite some bytes from the bundle
+  return (// this is a quicker (but less type safe) way to save quite some bytes from the bundle
+    // $FlowFixMe[incompatible-return]
+    // $FlowFixMe[prop-missing]
     element.assignedSlot || // step into the shadow DOM of the parent of a slotted node
-    element.parentNode || // DOM Element detected
-    // $FlowFixMe: need a better way to handle this...
-    element.host || // ShadowRoot detected
-    // $FlowFixMe: HTMLElement is a Node
+    element.parentNode || ( // DOM Element detected
+    isShadowRoot(element) ? element.host : null) || // ShadowRoot detected
+    // $FlowFixMe[incompatible-call]: HTMLElement is a Node
     getDocumentElement(element) // fallback
 
   );
@@ -180,7 +207,7 @@ function getParentNode(element) {
 
 function getScrollParent(node) {
   if (['html', 'body', '#document'].indexOf(getNodeName(node)) >= 0) {
-    // $FlowFixMe: assume body is always available
+    // $FlowFixMe[incompatible-return]: assume body is always available
     return node.ownerDocument.body;
   }
 
@@ -194,21 +221,23 @@ function getScrollParent(node) {
 /*
 given a DOM element, return the list of all scroll parents, up the list of ancesors
 until we get to the top window object. This list is what we attach scroll listeners
-to, because if any of these parent elements scroll, we'll need to re-calculate the 
+to, because if any of these parent elements scroll, we'll need to re-calculate the
 reference element's position.
 */
 
 function listScrollParents(element, list) {
+  var _element$ownerDocumen;
+
   if (list === void 0) {
     list = [];
   }
 
   var scrollParent = getScrollParent(element);
-  var isBody = getNodeName(scrollParent) === 'body';
+  var isBody = scrollParent === ((_element$ownerDocumen = element.ownerDocument) == null ? void 0 : _element$ownerDocumen.body);
   var win = getWindow(scrollParent);
   var target = isBody ? [win].concat(win.visualViewport || [], isScrollParent(scrollParent) ? scrollParent : []) : scrollParent;
   var updatedList = list.concat(target);
-  return isBody ? updatedList : // $FlowFixMe: isBody tells us target will be an HTMLElement here
+  return isBody ? updatedList : // $FlowFixMe[incompatible-call]: isBody tells us target will be an HTMLElement here
   updatedList.concat(listScrollParents(getParentNode(target)));
 }
 
@@ -222,29 +251,32 @@ function getTrueOffsetParent(element) {
     return null;
   }
 
-  var offsetParent = element.offsetParent;
-
-  if (offsetParent) {
-    var html = getDocumentElement(offsetParent);
-
-    if (getNodeName(offsetParent) === 'body' && getComputedStyle(offsetParent).position === 'static' && getComputedStyle(html).position !== 'static') {
-      return html;
-    }
-  }
-
-  return offsetParent;
+  return element.offsetParent;
 } // `.offsetParent` reports `null` for fixed elements, while absolute elements
 // return the containing block
 
 
 function getContainingBlock(element) {
+  var isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') !== -1;
+  var isIE = navigator.userAgent.indexOf('Trident') !== -1;
+
+  if (isIE && isHTMLElement(element)) {
+    // In IE 9, 10 and 11 fixed elements containing block is always established by the viewport
+    var elementCss = getComputedStyle(element);
+
+    if (elementCss.position === 'fixed') {
+      return null;
+    }
+  }
+
   var currentNode = getParentNode(element);
 
   while (isHTMLElement(currentNode) && ['html', 'body'].indexOf(getNodeName(currentNode)) < 0) {
     var css = getComputedStyle(currentNode); // This is non-exhaustive but covers the most common CSS properties that
     // create a containing block.
+    // https://developer.mozilla.org/en-US/docs/Web/CSS/Containing_block#identifying_the_containing_block
 
-    if (css.transform !== 'none' || css.perspective !== 'none' || css.willChange && css.willChange !== 'auto') {
+    if (css.transform !== 'none' || css.perspective !== 'none' || css.contain === 'paint' || ['transform', 'perspective'].indexOf(css.willChange) !== -1 || isFirefox && css.willChange === 'filter' || isFirefox && css.filter && css.filter !== 'none') {
       return currentNode;
     } else {
       currentNode = currentNode.parentNode;
@@ -264,7 +296,7 @@ function getOffsetParent(element) {
     offsetParent = getTrueOffsetParent(offsetParent);
   }
 
-  if (offsetParent && getNodeName(offsetParent) === 'body' && getComputedStyle(offsetParent).position === 'static') {
+  if (offsetParent && (getNodeName(offsetParent) === 'html' || getNodeName(offsetParent) === 'body' && getComputedStyle(offsetParent).position === 'static')) {
     return window;
   }
 
@@ -466,9 +498,9 @@ function getBasePlacement(placement) {
 function mergeByName(modifiers) {
   var merged = modifiers.reduce(function (merged, current) {
     var existing = merged[current.name];
-    merged[current.name] = existing ? Object.assign(Object.assign(Object.assign({}, existing), current), {}, {
-      options: Object.assign(Object.assign({}, existing.options), current.options),
-      data: Object.assign(Object.assign({}, existing.data), current.data)
+    merged[current.name] = existing ? Object.assign({}, existing, current, {
+      options: Object.assign({}, existing.options, current.options),
+      data: Object.assign({}, existing.data, current.data)
     }) : current;
     return merged;
   }, {}); // IE11 does not support Object.values
@@ -516,19 +548,25 @@ function getViewportRect(element) {
   };
 }
 
+var max = Math.max;
+var min = Math.min;
+var round = Math.round;
+
 // of the `<html>` and `<body>` rect bounds if horizontally scrollable
 
 function getDocumentRect(element) {
+  var _element$ownerDocumen;
+
   var html = getDocumentElement(element);
   var winScroll = getWindowScroll(element);
-  var body = element.ownerDocument.body;
-  var width = Math.max(html.scrollWidth, html.clientWidth, body ? body.scrollWidth : 0, body ? body.clientWidth : 0);
-  var height = Math.max(html.scrollHeight, html.clientHeight, body ? body.scrollHeight : 0, body ? body.clientHeight : 0);
+  var body = (_element$ownerDocumen = element.ownerDocument) == null ? void 0 : _element$ownerDocumen.body;
+  var width = max(html.scrollWidth, html.clientWidth, body ? body.scrollWidth : 0, body ? body.clientWidth : 0);
+  var height = max(html.scrollHeight, html.clientHeight, body ? body.scrollHeight : 0, body ? body.clientHeight : 0);
   var x = -winScroll.scrollLeft + getWindowScrollBarX(element);
   var y = -winScroll.scrollTop;
 
   if (getComputedStyle(body || html).direction === 'rtl') {
-    x += Math.max(html.clientWidth, body ? body.clientWidth : 0) - width;
+    x += max(html.clientWidth, body ? body.clientWidth : 0) - width;
   }
 
   return {
@@ -540,19 +578,18 @@ function getDocumentRect(element) {
 }
 
 function contains(parent, child) {
-  // $FlowFixMe: hasOwnProperty doesn't seem to work in tests
-  var isShadow = Boolean(child.getRootNode && child.getRootNode().host); // First, attempt with faster native method
+  var rootNode = child.getRootNode && child.getRootNode(); // First, attempt with faster native method
 
   if (parent.contains(child)) {
     return true;
   } // then fallback to custom implementation with Shadow DOM support
-  else if (isShadow) {
+  else if (rootNode && isShadowRoot(rootNode)) {
       var next = child;
 
       do {
         if (next && parent.isSameNode(next)) {
           return true;
-        } // $FlowFixMe: need a better way to handle this...
+        } // $FlowFixMe[prop-missing]: need a better way to handle this...
 
 
         next = next.parentNode || next.host;
@@ -564,7 +601,7 @@ function contains(parent, child) {
 }
 
 function rectToClientRect(rect) {
-  return Object.assign(Object.assign({}, rect), {}, {
+  return Object.assign({}, rect, {
     left: rect.x,
     top: rect.y,
     right: rect.x + rect.width,
@@ -599,7 +636,7 @@ function getClippingParents(element) {
 
   if (!isElement(clipperElement)) {
     return [];
-  } // $FlowFixMe: https://github.com/facebook/flow/issues/1414
+  } // $FlowFixMe[incompatible-return]: https://github.com/facebook/flow/issues/1414
 
 
   return clippingParents.filter(function (clippingParent) {
@@ -615,10 +652,10 @@ function getClippingRect(element, boundary, rootBoundary) {
   var firstClippingParent = clippingParents[0];
   var clippingRect = clippingParents.reduce(function (accRect, clippingParent) {
     var rect = getClientRectFromMixedType(element, clippingParent);
-    accRect.top = Math.max(rect.top, accRect.top);
-    accRect.right = Math.min(rect.right, accRect.right);
-    accRect.bottom = Math.min(rect.bottom, accRect.bottom);
-    accRect.left = Math.max(rect.left, accRect.left);
+    accRect.top = max(rect.top, accRect.top);
+    accRect.right = min(rect.right, accRect.right);
+    accRect.bottom = min(rect.bottom, accRect.bottom);
+    accRect.left = max(rect.left, accRect.left);
     return accRect;
   }, getClientRectFromMixedType(element, firstClippingParent));
   clippingRect.width = clippingRect.right - clippingRect.left;
@@ -689,11 +726,11 @@ function computeOffsets(_ref) {
 
     switch (variation) {
       case start:
-        offsets[mainAxis] = Math.floor(offsets[mainAxis]) - Math.floor(reference[len] / 2 - element[len] / 2);
+        offsets[mainAxis] = offsets[mainAxis] - (reference[len] / 2 - element[len] / 2);
         break;
 
       case end:
-        offsets[mainAxis] = Math.floor(offsets[mainAxis]) + Math.ceil(reference[len] / 2 - element[len] / 2);
+        offsets[mainAxis] = offsets[mainAxis] + (reference[len] / 2 - element[len] / 2);
         break;
     }
   }
@@ -711,7 +748,7 @@ function getFreshSideObject() {
 }
 
 function mergePaddingObject(paddingObject) {
-  return Object.assign(Object.assign({}, getFreshSideObject()), paddingObject);
+  return Object.assign({}, getFreshSideObject(), paddingObject);
 }
 
 function expandToHashMap(value, keys) {
@@ -752,7 +789,7 @@ function detectOverflow(state, options) {
     strategy: 'absolute',
     placement: placement
   });
-  var popperClientRect = rectToClientRect(Object.assign(Object.assign({}, popperRect), popperOffsets));
+  var popperClientRect = rectToClientRect(Object.assign({}, popperRect, popperOffsets));
   var elementClientRect = elementContext === popper ? popperClientRect : referenceClientRect; // positive = overflowing the clipping rect
   // 0 or negative = within the clipping rect
 
@@ -812,7 +849,7 @@ function popperGenerator(generatorOptions) {
     var state = {
       placement: 'bottom',
       orderedModifiers: [],
-      options: Object.assign(Object.assign({}, DEFAULT_OPTIONS), defaultOptions),
+      options: Object.assign({}, DEFAULT_OPTIONS, defaultOptions),
       modifiersData: {},
       elements: {
         reference: reference,
@@ -827,7 +864,7 @@ function popperGenerator(generatorOptions) {
       state: state,
       setOptions: function setOptions(options) {
         cleanupModifierEffects();
-        state.options = Object.assign(Object.assign(Object.assign({}, defaultOptions), state.options), options);
+        state.options = Object.assign({}, defaultOptions, state.options, options);
         state.scrollParents = {
           reference: isElement(reference) ? listScrollParents(reference) : reference.contextElement ? listScrollParents(reference.contextElement) : [],
           popper: listScrollParents(popper)
@@ -1022,7 +1059,7 @@ var passive = {
   passive: true
 };
 
-function effect(_ref) {
+function effect$2(_ref) {
   var state = _ref.state,
       instance = _ref.instance,
       options = _ref.options;
@@ -1062,7 +1099,7 @@ var eventListeners = {
   enabled: true,
   phase: 'write',
   fn: function fn() {},
-  effect: effect,
+  effect: effect$2,
   data: {}
 };
 
@@ -1099,14 +1136,14 @@ var unsetSides = {
 // Zooming can change the DPR, but it seems to report a value that will
 // cleanly divide the values into the appropriate subpixels.
 
-function roundOffsets(_ref) {
+function roundOffsetsByDPR(_ref) {
   var x = _ref.x,
       y = _ref.y;
   var win = window;
   var dpr = win.devicePixelRatio || 1;
   return {
-    x: Math.round(x * dpr) / dpr || 0,
-    y: Math.round(y * dpr) / dpr || 0
+    x: round(round(x * dpr) / dpr) || 0,
+    y: round(round(y * dpr) / dpr) || 0
   };
 }
 
@@ -1119,11 +1156,14 @@ function mapToStyles(_ref2) {
       offsets = _ref2.offsets,
       position = _ref2.position,
       gpuAcceleration = _ref2.gpuAcceleration,
-      adaptive = _ref2.adaptive;
+      adaptive = _ref2.adaptive,
+      roundOffsets = _ref2.roundOffsets;
 
-  var _roundOffsets = roundOffsets(offsets),
-      x = _roundOffsets.x,
-      y = _roundOffsets.y;
+  var _ref3 = roundOffsets === true ? roundOffsetsByDPR(offsets) : typeof roundOffsets === 'function' ? roundOffsets(offsets) : offsets,
+      _ref3$x = _ref3.x,
+      x = _ref3$x === void 0 ? 0 : _ref3$x,
+      _ref3$y = _ref3.y,
+      y = _ref3$y === void 0 ? 0 : _ref3$y;
 
   var hasX = offsets.hasOwnProperty('x');
   var hasY = offsets.hasOwnProperty('y');
@@ -1133,23 +1173,32 @@ function mapToStyles(_ref2) {
 
   if (adaptive) {
     var offsetParent = getOffsetParent(popper);
+    var heightProp = 'clientHeight';
+    var widthProp = 'clientWidth';
 
     if (offsetParent === getWindow(popper)) {
       offsetParent = getDocumentElement(popper);
-    } // $FlowFixMe: force type refinement, we compare offsetParent with window above, but Flow doesn't detect it
 
-    /*:: offsetParent = (offsetParent: Element); */
+      if (getComputedStyle(offsetParent).position !== 'static') {
+        heightProp = 'scrollHeight';
+        widthProp = 'scrollWidth';
+      }
+    } // $FlowFixMe[incompatible-cast]: force type refinement, we compare offsetParent with window above, but Flow doesn't detect it
 
+
+    offsetParent = offsetParent;
 
     if (placement === top) {
-      sideY = bottom;
-      y -= offsetParent.clientHeight - popperRect.height;
+      sideY = bottom; // $FlowFixMe[prop-missing]
+
+      y -= offsetParent[heightProp] - popperRect.height;
       y *= gpuAcceleration ? 1 : -1;
     }
 
     if (placement === left) {
-      sideX = right;
-      x -= offsetParent.clientWidth - popperRect.width;
+      sideX = right; // $FlowFixMe[prop-missing]
+
+      x -= offsetParent[widthProp] - popperRect.width;
       x *= gpuAcceleration ? 1 : -1;
     }
   }
@@ -1161,19 +1210,21 @@ function mapToStyles(_ref2) {
   if (gpuAcceleration) {
     var _Object$assign;
 
-    return Object.assign(Object.assign({}, commonStyles), {}, (_Object$assign = {}, _Object$assign[sideY] = hasY ? '0' : '', _Object$assign[sideX] = hasX ? '0' : '', _Object$assign.transform = (win.devicePixelRatio || 1) < 2 ? "translate(" + x + "px, " + y + "px)" : "translate3d(" + x + "px, " + y + "px, 0)", _Object$assign));
+    return Object.assign({}, commonStyles, (_Object$assign = {}, _Object$assign[sideY] = hasY ? '0' : '', _Object$assign[sideX] = hasX ? '0' : '', _Object$assign.transform = (win.devicePixelRatio || 1) < 2 ? "translate(" + x + "px, " + y + "px)" : "translate3d(" + x + "px, " + y + "px, 0)", _Object$assign));
   }
 
-  return Object.assign(Object.assign({}, commonStyles), {}, (_Object$assign2 = {}, _Object$assign2[sideY] = hasY ? y + "px" : '', _Object$assign2[sideX] = hasX ? x + "px" : '', _Object$assign2.transform = '', _Object$assign2));
+  return Object.assign({}, commonStyles, (_Object$assign2 = {}, _Object$assign2[sideY] = hasY ? y + "px" : '', _Object$assign2[sideX] = hasX ? x + "px" : '', _Object$assign2.transform = '', _Object$assign2));
 }
 
-function computeStyles(_ref3) {
-  var state = _ref3.state,
-      options = _ref3.options;
+function computeStyles(_ref4) {
+  var state = _ref4.state,
+      options = _ref4.options;
   var _options$gpuAccelerat = options.gpuAcceleration,
       gpuAcceleration = _options$gpuAccelerat === void 0 ? true : _options$gpuAccelerat,
       _options$adaptive = options.adaptive,
-      adaptive = _options$adaptive === void 0 ? true : _options$adaptive;
+      adaptive = _options$adaptive === void 0 ? true : _options$adaptive,
+      _options$roundOffsets = options.roundOffsets,
+      roundOffsets = _options$roundOffsets === void 0 ? true : _options$roundOffsets;
 
   if (process.env.NODE_ENV !== "production") {
     var transitionProperty = getComputedStyle(state.elements.popper).transitionProperty || '';
@@ -1193,22 +1244,24 @@ function computeStyles(_ref3) {
   };
 
   if (state.modifiersData.popperOffsets != null) {
-    state.styles.popper = Object.assign(Object.assign({}, state.styles.popper), mapToStyles(Object.assign(Object.assign({}, commonStyles), {}, {
+    state.styles.popper = Object.assign({}, state.styles.popper, mapToStyles(Object.assign({}, commonStyles, {
       offsets: state.modifiersData.popperOffsets,
       position: state.options.strategy,
-      adaptive: adaptive
+      adaptive: adaptive,
+      roundOffsets: roundOffsets
     })));
   }
 
   if (state.modifiersData.arrow != null) {
-    state.styles.arrow = Object.assign(Object.assign({}, state.styles.arrow), mapToStyles(Object.assign(Object.assign({}, commonStyles), {}, {
+    state.styles.arrow = Object.assign({}, state.styles.arrow, mapToStyles(Object.assign({}, commonStyles, {
       offsets: state.modifiersData.arrow,
       position: 'absolute',
-      adaptive: false
+      adaptive: false,
+      roundOffsets: roundOffsets
     })));
   }
 
-  state.attributes.popper = Object.assign(Object.assign({}, state.attributes.popper), {}, {
+  state.attributes.popper = Object.assign({}, state.attributes.popper, {
     'data-popper-placement': state.placement
   });
 } // eslint-disable-next-line import/no-unused-modules
@@ -1235,7 +1288,7 @@ function applyStyles(_ref) {
       return;
     } // Flow doesn't support to extend this property, but it's the most
     // effective way to apply styles to an HTMLElement
-    // $FlowFixMe
+    // $FlowFixMe[cannot-write]
 
 
     Object.assign(element.style, style);
@@ -1266,6 +1319,7 @@ function effect$1(_ref2) {
     reference: {}
   };
   Object.assign(state.elements.popper.style, initialStyles.popper);
+  state.styles = initialStyles;
 
   if (state.elements.arrow) {
     Object.assign(state.elements.arrow.style, initialStyles.arrow);
@@ -1284,10 +1338,7 @@ function effect$1(_ref2) {
 
       if (!isHTMLElement(element) || !getNodeName(element)) {
         return;
-      } // Flow doesn't support to extend this property, but it's the most
-      // effective way to apply styles to an HTMLElement
-      // $FlowFixMe
-
+      }
 
       Object.assign(element.style, style);
       Object.keys(attributes).forEach(function (attribute) {
@@ -1311,7 +1362,7 @@ function distanceAndSkiddingToXY(placement, rects, offset) {
   var basePlacement = getBasePlacement(placement);
   var invertDistance = [left, top].indexOf(basePlacement) >= 0 ? -1 : 1;
 
-  var _ref = typeof offset === 'function' ? offset(Object.assign(Object.assign({}, rects), {}, {
+  var _ref = typeof offset === 'function' ? offset(Object.assign({}, rects, {
     placement: placement
   })) : offset,
       skidding = _ref[0],
@@ -1359,7 +1410,7 @@ var offset$1 = {
   fn: offset
 };
 
-var hash = {
+var hash$1 = {
   left: 'right',
   right: 'left',
   bottom: 'top',
@@ -1367,23 +1418,20 @@ var hash = {
 };
 function getOppositePlacement(placement) {
   return placement.replace(/left|right|bottom|top/g, function (matched) {
-    return hash[matched];
+    return hash$1[matched];
   });
 }
 
-var hash$1 = {
+var hash = {
   start: 'end',
   end: 'start'
 };
 function getOppositeVariationPlacement(placement) {
   return placement.replace(/start|end/g, function (matched) {
-    return hash$1[matched];
+    return hash[matched];
   });
 }
 
-/*:: type OverflowsMap = { [ComputedPlacement]: number }; */
-
-/*;; type OverflowsMap = { [key in ComputedPlacement]: number }; */
 function computeAutoPlacement(state, options) {
   if (options === void 0) {
     options = {};
@@ -1400,8 +1448,7 @@ function computeAutoPlacement(state, options) {
   var variation = getVariation(placement);
   var placements$1 = variation ? flipVariations ? variationPlacements : variationPlacements.filter(function (placement) {
     return getVariation(placement) === variation;
-  }) : basePlacements; // $FlowFixMe
-
+  }) : basePlacements;
   var allowedPlacements = placements$1.filter(function (placement) {
     return allowedAutoPlacements.indexOf(placement) >= 0;
   });
@@ -1412,7 +1459,7 @@ function computeAutoPlacement(state, options) {
     if (process.env.NODE_ENV !== "production") {
       console.error(['Popper: The `allowedAutoPlacements` option did not allow any', 'placements. Ensure the `placement` option matches the variation', 'of the allowed placements.', 'For example, "auto" cannot be used to allow "bottom-start".', 'Use "auto-start" instead.'].join(' '));
     }
-  } // $FlowFixMe: Flow seems to have problems with two array unions...
+  } // $FlowFixMe[incompatible-type]: Flow seems to have problems with two array unions...
 
 
   var overflows = allowedPlacements.reduce(function (acc, placement) {
@@ -1573,8 +1620,8 @@ function getAltAxis(axis) {
   return axis === 'x' ? 'y' : 'x';
 }
 
-function within(min, value, max) {
-  return Math.max(min, Math.min(value, max));
+function within(min$1, value, max$1) {
+  return max(min$1, min(value, max$1));
 }
 
 function preventOverflow(_ref) {
@@ -1607,7 +1654,7 @@ function preventOverflow(_ref) {
   var popperOffsets = state.modifiersData.popperOffsets;
   var referenceRect = state.rects.reference;
   var popperRect = state.rects.popper;
-  var tetherOffsetValue = typeof tetherOffset === 'function' ? tetherOffset(Object.assign(Object.assign({}, state.rects), {}, {
+  var tetherOffsetValue = typeof tetherOffset === 'function' ? tetherOffset(Object.assign({}, state.rects, {
     placement: state.placement
   })) : tetherOffset;
   var data = {
@@ -1619,13 +1666,13 @@ function preventOverflow(_ref) {
     return;
   }
 
-  if (checkMainAxis) {
+  if (checkMainAxis || checkAltAxis) {
     var mainSide = mainAxis === 'y' ? top : left;
     var altSide = mainAxis === 'y' ? bottom : right;
     var len = mainAxis === 'y' ? 'height' : 'width';
     var offset = popperOffsets[mainAxis];
-    var min = popperOffsets[mainAxis] + overflow[mainSide];
-    var max = popperOffsets[mainAxis] - overflow[altSide];
+    var min$1 = popperOffsets[mainAxis] + overflow[mainSide];
+    var max$1 = popperOffsets[mainAxis] - overflow[altSide];
     var additive = tether ? -popperRect[len] / 2 : 0;
     var minLen = variation === start ? referenceRect[len] : popperRect[len];
     var maxLen = variation === start ? -popperRect[len] : -referenceRect[len]; // We need to include the arrow in the calculation so the arrow doesn't go
@@ -1652,26 +1699,29 @@ function preventOverflow(_ref) {
     var offsetModifierValue = state.modifiersData.offset ? state.modifiersData.offset[state.placement][mainAxis] : 0;
     var tetherMin = popperOffsets[mainAxis] + minOffset - offsetModifierValue - clientOffset;
     var tetherMax = popperOffsets[mainAxis] + maxOffset - offsetModifierValue;
-    var preventedOffset = within(tether ? Math.min(min, tetherMin) : min, offset, tether ? Math.max(max, tetherMax) : max);
-    popperOffsets[mainAxis] = preventedOffset;
-    data[mainAxis] = preventedOffset - offset;
-  }
 
-  if (checkAltAxis) {
-    var _mainSide = mainAxis === 'x' ? top : left;
+    if (checkMainAxis) {
+      var preventedOffset = within(tether ? min(min$1, tetherMin) : min$1, offset, tether ? max(max$1, tetherMax) : max$1);
+      popperOffsets[mainAxis] = preventedOffset;
+      data[mainAxis] = preventedOffset - offset;
+    }
 
-    var _altSide = mainAxis === 'x' ? bottom : right;
+    if (checkAltAxis) {
+      var _mainSide = mainAxis === 'x' ? top : left;
 
-    var _offset = popperOffsets[altAxis];
+      var _altSide = mainAxis === 'x' ? bottom : right;
 
-    var _min = _offset + overflow[_mainSide];
+      var _offset = popperOffsets[altAxis];
 
-    var _max = _offset - overflow[_altSide];
+      var _min = _offset + overflow[_mainSide];
 
-    var _preventedOffset = within(_min, _offset, _max);
+      var _max = _offset - overflow[_altSide];
 
-    popperOffsets[altAxis] = _preventedOffset;
-    data[altAxis] = _preventedOffset - _offset;
+      var _preventedOffset = within(tether ? min(_min, tetherMin) : _min, _offset, tether ? max(_max, tetherMax) : _max);
+
+      popperOffsets[altAxis] = _preventedOffset;
+      data[altAxis] = _preventedOffset - _offset;
+    }
   }
 
   state.modifiersData[name] = data;
@@ -1686,11 +1736,19 @@ var preventOverflow$1 = {
   requiresIfExists: ['offset']
 };
 
+var toPaddingObject = function toPaddingObject(padding, state) {
+  padding = typeof padding === 'function' ? padding(Object.assign({}, state.rects, {
+    placement: state.placement
+  })) : padding;
+  return mergePaddingObject(typeof padding !== 'number' ? padding : expandToHashMap(padding, basePlacements));
+};
+
 function arrow(_ref) {
   var _state$modifiersData$;
 
   var state = _ref.state,
-      name = _ref.name;
+      name = _ref.name,
+      options = _ref.options;
   var arrowElement = state.elements.arrow;
   var popperOffsets = state.modifiersData.popperOffsets;
   var basePlacement = getBasePlacement(state.placement);
@@ -1702,7 +1760,7 @@ function arrow(_ref) {
     return;
   }
 
-  var paddingObject = state.modifiersData[name + "#persistent"].padding;
+  var paddingObject = toPaddingObject(options.padding, state);
   var arrowRect = getLayoutRect(arrowElement);
   var minProp = axis === 'y' ? top : left;
   var maxProp = axis === 'y' ? bottom : right;
@@ -1722,14 +1780,11 @@ function arrow(_ref) {
   state.modifiersData[name] = (_state$modifiersData$ = {}, _state$modifiersData$[axisProp] = offset, _state$modifiersData$.centerOffset = offset - center, _state$modifiersData$);
 }
 
-function effect$2(_ref2) {
+function effect(_ref2) {
   var state = _ref2.state,
-      options = _ref2.options,
-      name = _ref2.name;
+      options = _ref2.options;
   var _options$element = options.element,
-      arrowElement = _options$element === void 0 ? '[data-popper-arrow]' : _options$element,
-      _options$padding = options.padding,
-      padding = _options$padding === void 0 ? 0 : _options$padding;
+      arrowElement = _options$element === void 0 ? '[data-popper-arrow]' : _options$element;
 
   if (arrowElement == null) {
     return;
@@ -1759,9 +1814,6 @@ function effect$2(_ref2) {
   }
 
   state.elements.arrow = arrowElement;
-  state.modifiersData[name + "#persistent"] = {
-    padding: mergePaddingObject(typeof padding !== 'number' ? padding : expandToHashMap(padding, basePlacements))
-  };
 } // eslint-disable-next-line import/no-unused-modules
 
 
@@ -1770,7 +1822,7 @@ var arrow$1 = {
   enabled: true,
   phase: 'main',
   fn: arrow,
-  effect: effect$2,
+  effect: effect,
   requires: ['popperOffsets'],
   requiresIfExists: ['preventOverflow']
 };
@@ -1819,7 +1871,7 @@ function hide(_ref) {
     isReferenceHidden: isReferenceHidden,
     hasPopperEscaped: hasPopperEscaped
   };
-  state.attributes.popper = Object.assign(Object.assign({}, state.attributes.popper), {}, {
+  state.attributes.popper = Object.assign({}, state.attributes.popper, {
     'data-popper-reference-hidden': isReferenceHidden,
     'data-popper-escaped': hasPopperEscaped
   });
@@ -1834,19 +1886,34 @@ var hide$1 = {
   fn: hide
 };
 
+var defaultModifiers$1 = [eventListeners, popperOffsets$1, computeStyles$1, applyStyles$1];
+var createPopper$1 = /*#__PURE__*/popperGenerator({
+  defaultModifiers: defaultModifiers$1
+}); // eslint-disable-next-line import/no-unused-modules
+
 var defaultModifiers = [eventListeners, popperOffsets$1, computeStyles$1, applyStyles$1, offset$1, flip$1, preventOverflow$1, arrow$1, hide$1];
 var createPopper = /*#__PURE__*/popperGenerator({
   defaultModifiers: defaultModifiers
 }); // eslint-disable-next-line import/no-unused-modules
 
+exports.applyStyles = applyStyles$1;
+exports.arrow = arrow$1;
+exports.computeStyles = computeStyles$1;
 exports.createPopper = createPopper;
+exports.createPopperLite = createPopper$1;
 exports.defaultModifiers = defaultModifiers;
 exports.detectOverflow = detectOverflow;
+exports.eventListeners = eventListeners;
+exports.flip = flip$1;
+exports.hide = hide$1;
+exports.offset = offset$1;
 exports.popperGenerator = popperGenerator;
+exports.popperOffsets = popperOffsets$1;
+exports.preventOverflow = preventOverflow$1;
 
 
-}).call(this,require('_process'))
-},{"_process":19}],2:[function(require,module,exports){
+}).call(this)}).call(this,require('_process'))
+},{"_process":20}],3:[function(require,module,exports){
 /**
  * @overview NPM Module index: include all the core modules, I18n files will be loaded on the fly.
  * @author Gregory Wild-Smith <gregory@wild-smith.com>
@@ -1866,7 +1933,7 @@ require("./src/core/time_span.js");
 /*
  * Notice that there is no model.export or exports. This is not required as it modifies the Date object and it's prototypes.
  */
-},{"./src/core/core-prototypes.js":3,"./src/core/core.js":4,"./src/core/extras.js":5,"./src/core/format_parser.js":6,"./src/core/i18n.js":7,"./src/core/parser.js":8,"./src/core/parsing_grammar.js":9,"./src/core/parsing_operators.js":10,"./src/core/parsing_translator.js":11,"./src/core/sugarpak.js":12,"./src/core/time_period.js":13,"./src/core/time_span.js":14}],3:[function(require,module,exports){
+},{"./src/core/core-prototypes.js":4,"./src/core/core.js":5,"./src/core/extras.js":6,"./src/core/format_parser.js":7,"./src/core/i18n.js":8,"./src/core/parser.js":9,"./src/core/parsing_grammar.js":10,"./src/core/parsing_operators.js":11,"./src/core/parsing_translator.js":12,"./src/core/sugarpak.js":13,"./src/core/time_period.js":14,"./src/core/time_span.js":15}],4:[function(require,module,exports){
 (function () {
 	var $D = Date,
 		$P = $D.prototype,
@@ -2636,7 +2703,7 @@ require("./src/core/time_span.js");
 	};
 
 }());
-},{}],4:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 (function () {
 	var $D = Date,
 		$P = $D.prototype,
@@ -2981,7 +3048,7 @@ require("./src/core/time_span.js");
 
 }());
 
-},{}],5:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 (function () {
 	var $D = Date,
 		$P = $D.prototype,
@@ -3296,7 +3363,7 @@ require("./src/core/time_span.js");
 		$P.format = $P._format;
 	}
 }());
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 (function () {
 	"use strict";
 	Date.Parsing = {
@@ -3678,7 +3745,7 @@ require("./src/core/time_span.js");
 	};
 	$P.Normalizer.buildReplaceData();
 }());
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 (function () {
 	var $D = Date;
 	var lang = Date.CultureStrings ? Date.CultureStrings.lang : null;
@@ -4095,7 +4162,7 @@ require("./src/core/time_span.js");
 	};
 	$D.i18n.updateCultureInfo(); // run automatically
 }());
-},{}],8:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 (function () {
 	var $D = Date;
 
@@ -4303,7 +4370,7 @@ require("./src/core/time_span.js");
 	};
 }());
 
-},{}],9:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 (function () {
 	var $D = Date;
 	$D.Grammar = {};
@@ -4614,7 +4681,7 @@ require("./src/core/time_span.js");
 		return g._start.call({}, s);
 	};
 }());
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 (function () {
 	var $P = Date.Parsing;
 	var _ = $P.Operators = {
@@ -5073,7 +5140,7 @@ require("./src/core/time_span.js");
 	}
 	
 }());
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 (function () {
 	var $D = Date;
 
@@ -5436,7 +5503,7 @@ require("./src/core/time_span.js");
 		}
 	};
 }());
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 /*************************************************************
  * SugarPak - Domain Specific Language -  Syntactical Sugar  *
  *************************************************************/
@@ -5931,7 +5998,7 @@ require("./src/core/time_span.js");
 	}
 }());
 
-},{}],13:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 (function () {
 	"use strict";
 	var attrs = ["years", "months", "days", "hours", "minutes", "seconds", "milliseconds"];
@@ -6033,7 +6100,7 @@ require("./src/core/time_span.js");
 		window.TimePeriod = TimePeriod;
 	}
 }());
-},{}],14:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 (function () {
 	"use strict";
 	var gFn = function (attr) {
@@ -6210,7 +6277,7 @@ require("./src/core/time_span.js");
 		window.TimeSpan = TimeSpan;
 	}
 }());
-},{}],15:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 // HumanizeDuration.js - https://git.io/j0HgmQ
 
 /* global define, module */
@@ -6247,36 +6314,77 @@ require("./src/core/time_span.js");
         ? "χιλιοστό του δευτερολέπτου"
         : "χιλιοστά του δευτερολέπτου";
     },
-    decimal: ",",
+    decimal: ","
   };
 
+  var ARABIC_DIGITS = ["۰", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
+
   var LANGUAGES = {
-    ar: {
-      y: function (c) {
-        return c === 1 ? "سنة" : "سنوات";
-      },
+    af: {
+      y: "jaar",
       mo: function (c) {
-        return c === 1 ? "شهر" : "أشهر";
+        return "maand" + (c === 1 ? "" : "e");
       },
       w: function (c) {
-        return c === 1 ? "أسبوع" : "أسابيع";
+        return c === 1 ? "week" : "weke";
       },
       d: function (c) {
-        return c === 1 ? "يوم" : "أيام";
+        return c === 1 ? "dag" : "dae";
       },
       h: function (c) {
-        return c === 1 ? "ساعة" : "ساعات";
+        return c === 1 ? "uur" : "ure";
       },
       m: function (c) {
-        return c > 2 && c < 11 ? "دقائق" : "دقيقة";
+        return c === 1 ? "minuut" : "minute";
       },
       s: function (c) {
-        return c === 1 ? "ثانية" : "ثواني";
+        return "sekonde" + (c === 1 ? "" : "s");
       },
       ms: function (c) {
-        return c === 1 ? "جزء من الثانية" : "أجزاء من الثانية";
+        return "millisekonde" + (c === 1 ? "" : "s");
+      },
+      decimal: ","
+    },
+    ar: {
+      y: function (c) {
+        return ["سنة", "سنتان", "سنوات"][getArabicForm(c)];
+      },
+      mo: function (c) {
+        return ["شهر", "شهران", "أشهر"][getArabicForm(c)];
+      },
+      w: function (c) {
+        return ["أسبوع", "أسبوعين", "أسابيع"][getArabicForm(c)];
+      },
+      d: function (c) {
+        return ["يوم", "يومين", "أيام"][getArabicForm(c)];
+      },
+      h: function (c) {
+        return ["ساعة", "ساعتين", "ساعات"][getArabicForm(c)];
+      },
+      m: function (c) {
+        return ["دقيقة", "دقيقتان", "دقائق"][getArabicForm(c)];
+      },
+      s: function (c) {
+        return ["ثانية", "ثانيتان", "ثواني"][getArabicForm(c)];
+      },
+      ms: function (c) {
+        return ["جزء من الثانية", "جزآن من الثانية", "أجزاء من الثانية"][
+          getArabicForm(c)
+        ];
       },
       decimal: ",",
+      delimiter: " و ",
+      _formatCount: function (count, decimal) {
+        var replacements = assign(ARABIC_DIGITS, { ".": decimal });
+        var characters = count.toString().split("");
+        for (var i = 0; i < characters.length; i++) {
+          var character = characters[i];
+          if (has(replacements, character)) {
+            characters[i] = replacements[character];
+          }
+        }
+        return characters.join("");
+      }
     },
     bg: {
       y: function (c) {
@@ -6303,7 +6411,17 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return ["милисекунди", "милисекунда", "милисекунди"][getSlavicForm(c)];
       },
-      decimal: ",",
+      decimal: ","
+    },
+    bn: {
+      y: "বছর",
+      mo: "মাস",
+      w: "সপ্তাহ",
+      d: "দিন",
+      h: "ঘন্টা",
+      m: "মিনিট",
+      s: "সেকেন্ড",
+      ms: "মিলিসেকেন্ড"
     },
     ca: {
       y: function (c) {
@@ -6330,7 +6448,7 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return "milisegon" + (c === 1 ? "" : "s");
       },
-      decimal: ",",
+      decimal: ","
     },
     cs: {
       y: function (c) {
@@ -6361,7 +6479,17 @@ require("./src/core/time_span.js");
           getCzechOrSlovakForm(c)
         ];
       },
-      decimal: ",",
+      decimal: ","
+    },
+    cy: {
+      y: "flwyddyn",
+      mo: "mis",
+      w: "wythnos",
+      d: "diwrnod",
+      h: "awr",
+      m: "munud",
+      s: "eiliad",
+      ms: "milieiliad"
     },
     da: {
       y: "år",
@@ -6386,7 +6514,7 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return "millisekund" + (c === 1 ? "" : "er");
       },
-      decimal: ",",
+      decimal: ","
     },
     de: {
       y: function (c) {
@@ -6413,7 +6541,7 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return "Millisekunde" + (c === 1 ? "" : "n");
       },
-      decimal: ",",
+      decimal: ","
     },
     el: greek,
     en: {
@@ -6441,7 +6569,34 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return "millisecond" + (c === 1 ? "" : "s");
       },
-      decimal: ".",
+      decimal: "."
+    },
+    eo: {
+      y: function (c) {
+        return "jaro" + (c === 1 ? "" : "j");
+      },
+      mo: function (c) {
+        return "monato" + (c === 1 ? "" : "j");
+      },
+      w: function (c) {
+        return "semajno" + (c === 1 ? "" : "j");
+      },
+      d: function (c) {
+        return "tago" + (c === 1 ? "" : "j");
+      },
+      h: function (c) {
+        return "horo" + (c === 1 ? "" : "j");
+      },
+      m: function (c) {
+        return "minuto" + (c === 1 ? "" : "j");
+      },
+      s: function (c) {
+        return "sekundo" + (c === 1 ? "" : "j");
+      },
+      ms: function (c) {
+        return "milisekundo" + (c === 1 ? "" : "j");
+      },
+      decimal: ","
     },
     es: {
       y: function (c) {
@@ -6468,7 +6623,7 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return "milisegundo" + (c === 1 ? "" : "s");
       },
-      decimal: ",",
+      decimal: ","
     },
     et: {
       y: function (c) {
@@ -6495,7 +6650,18 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return "millisekund" + (c === 1 ? "" : "it");
       },
-      decimal: ",",
+      decimal: ","
+    },
+    eu: {
+      y: "urte",
+      mo: "hilabete",
+      w: "aste",
+      d: "egun",
+      h: "ordu",
+      m: "minutu",
+      s: "segundo",
+      ms: "milisegundo",
+      decimal: ","
     },
     fa: {
       y: "سال",
@@ -6506,7 +6672,7 @@ require("./src/core/time_span.js");
       m: "دقیقه",
       s: "ثانیه",
       ms: "میلی ثانیه",
-      decimal: ".",
+      decimal: "."
     },
     fi: {
       y: function (c) {
@@ -6533,7 +6699,7 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return "millisekunti" + (c === 1 ? "" : "a");
       },
-      decimal: ",",
+      decimal: ","
     },
     fo: {
       y: "ár",
@@ -6554,7 +6720,7 @@ require("./src/core/time_span.js");
       },
       s: "sekund",
       ms: "millisekund",
-      decimal: ",",
+      decimal: ","
     },
     fr: {
       y: function (c) {
@@ -6579,7 +6745,7 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return "milliseconde" + (c >= 2 ? "s" : "");
       },
-      decimal: ",",
+      decimal: ","
     },
     gr: greek,
     he: {
@@ -6607,7 +6773,7 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return c === 1 ? "מילישנייה" : "מילישניות";
       },
-      decimal: ".",
+      decimal: "."
     },
     hr: {
       y: function (c) {
@@ -6649,22 +6815,12 @@ require("./src/core/time_span.js");
         return "minuta";
       },
       s: function (c) {
-        if (
-          c === 10 ||
-          c === 11 ||
-          c === 12 ||
-          c === 13 ||
-          c === 14 ||
-          c === 16 ||
-          c === 17 ||
-          c === 18 ||
-          c === 19 ||
-          c % 10 === 5
-        ) {
+        var mod10 = c % 10;
+        if (mod10 === 5 || (Math.floor(c) === c && c >= 10 && c <= 19)) {
           return "sekundi";
-        } else if (c % 10 === 1) {
+        } else if (mod10 === 1) {
           return "sekunda";
-        } else if (c % 10 === 2 || c % 10 === 3 || c % 10 === 4) {
+        } else if (mod10 === 2 || mod10 === 3 || mod10 === 4) {
           return "sekunde";
         }
         return "sekundi";
@@ -6677,7 +6833,24 @@ require("./src/core/time_span.js");
         }
         return "milisekundi";
       },
-      decimal: ",",
+      decimal: ","
+    },
+    hi: {
+      y: "साल",
+      mo: function (c) {
+        return c === 1 ? "महीना" : "महीने";
+      },
+      w: function (c) {
+        return c === 1 ? "हफ़्ता" : "हफ्ते";
+      },
+      d: "दिन",
+      h: function (c) {
+        return c === 1 ? "घंटा" : "घंटे";
+      },
+      m: "मिनट",
+      s: "सेकंड",
+      ms: "मिलीसेकंड",
+      decimal: "."
     },
     hu: {
       y: "év",
@@ -6688,7 +6861,7 @@ require("./src/core/time_span.js");
       m: "perc",
       s: "másodperc",
       ms: "ezredmásodperc",
-      decimal: ",",
+      decimal: ","
     },
     id: {
       y: "tahun",
@@ -6699,7 +6872,7 @@ require("./src/core/time_span.js");
       m: "menit",
       s: "detik",
       ms: "milidetik",
-      decimal: ".",
+      decimal: "."
     },
     is: {
       y: "ár",
@@ -6724,7 +6897,7 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return "millisekúnd" + (c === 1 ? "a" : "ur");
       },
-      decimal: ".",
+      decimal: "."
     },
     it: {
       y: function (c) {
@@ -6751,7 +6924,7 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return "millisecond" + (c === 1 ? "o" : "i");
       },
-      decimal: ",",
+      decimal: ","
     },
     ja: {
       y: "年",
@@ -6762,7 +6935,43 @@ require("./src/core/time_span.js");
       m: "分",
       s: "秒",
       ms: "ミリ秒",
-      decimal: ".",
+      decimal: "."
+    },
+    km: {
+      y: "ឆ្នាំ",
+      mo: "ខែ",
+      w: "សប្តាហ៍",
+      d: "ថ្ងៃ",
+      h: "ម៉ោង",
+      m: "នាទី",
+      s: "វិនាទី",
+      ms: "មិល្លីវិនាទី"
+    },
+    kn: {
+      y: function (c) {
+        return c === 1 ? "ವರ್ಷ" : "ವರ್ಷಗಳು";
+      },
+      mo: function (c) {
+        return c === 1 ? "ತಿಂಗಳು" : "ತಿಂಗಳುಗಳು";
+      },
+      w: function (c) {
+        return c === 1 ? "ವಾರ" : "ವಾರಗಳು";
+      },
+      d: function (c) {
+        return c === 1 ? "ದಿನ" : "ದಿನಗಳು";
+      },
+      h: function (c) {
+        return c === 1 ? "ಗಂಟೆ" : "ಗಂಟೆಗಳು";
+      },
+      m: function (c) {
+        return c === 1 ? "ನಿಮಿಷ" : "ನಿಮಿಷಗಳು";
+      },
+      s: function (c) {
+        return c === 1 ? "ಸೆಕೆಂಡ್" : "ಸೆಕೆಂಡುಗಳು";
+      },
+      ms: function (c) {
+        return c === 1 ? "ಮಿಲಿಸೆಕೆಂಡ್" : "ಮಿಲಿಸೆಕೆಂಡುಗಳು";
+      }
     },
     ko: {
       y: "년",
@@ -6773,7 +6982,18 @@ require("./src/core/time_span.js");
       m: "분",
       s: "초",
       ms: "밀리 초",
-      decimal: ".",
+      decimal: "."
+    },
+    ku: {
+      y: "sal",
+      mo: "meh",
+      w: "hefte",
+      d: "roj",
+      h: "seet",
+      m: "deqe",
+      s: "saniye",
+      ms: "mîlîçirk",
+      decimal: ","
     },
     lo: {
       y: "ປີ",
@@ -6784,7 +7004,7 @@ require("./src/core/time_span.js");
       m: "ນາທີ",
       s: "ວິນາທີ",
       ms: "ມິນລິວິນາທີ",
-      decimal: ",",
+      decimal: ","
     },
     lt: {
       y: function (c) {
@@ -6815,7 +7035,7 @@ require("./src/core/time_span.js");
           getLithuanianForm(c)
         ];
       },
-      decimal: ",",
+      decimal: ","
     },
     lv: {
       y: function (c) {
@@ -6842,7 +7062,52 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return getLatvianForm(c) ? "milisekunde" : "milisekundes";
       },
-      decimal: ",",
+      decimal: ","
+    },
+    mk: {
+      y: function (c) {
+        return c === 1 ? "година" : "години";
+      },
+      mo: function (c) {
+        return c === 1 ? "месец" : "месеци";
+      },
+      w: function (c) {
+        return c === 1 ? "недела" : "недели";
+      },
+      d: function (c) {
+        return c === 1 ? "ден" : "дена";
+      },
+      h: function (c) {
+        return c === 1 ? "час" : "часа";
+      },
+      m: function (c) {
+        return c === 1 ? "минута" : "минути";
+      },
+      s: function (c) {
+        return c === 1 ? "секунда" : "секунди";
+      },
+      ms: function (c) {
+        return c === 1 ? "милисекунда" : "милисекунди";
+      },
+      decimal: ","
+    },
+    mr: {
+      y: function (c) {
+        return c === 1 ? "वर्ष" : "वर्षे";
+      },
+      mo: function (c) {
+        return c === 1 ? "महिना" : "महिने";
+      },
+      w: function (c) {
+        return c === 1 ? "आठवडा" : "आठवडे";
+      },
+      d: "दिवस",
+      h: "तास",
+      m: function (c) {
+        return c === 1 ? "मिनिट" : "मिनिटे";
+      },
+      s: "सेकंद",
+      ms: "मिलिसेकंद"
     },
     ms: {
       y: "tahun",
@@ -6853,7 +7118,7 @@ require("./src/core/time_span.js");
       m: "minit",
       s: "saat",
       ms: "milisaat",
-      decimal: ".",
+      decimal: "."
     },
     nl: {
       y: "jaar",
@@ -6876,7 +7141,7 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return c === 1 ? "milliseconde" : "milliseconden";
       },
-      decimal: ",",
+      decimal: ","
     },
     no: {
       y: "år",
@@ -6901,7 +7166,7 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return "millisekund" + (c === 1 ? "" : "er");
       },
-      decimal: ",",
+      decimal: ","
     },
     pl: {
       y: function (c) {
@@ -6932,7 +7197,7 @@ require("./src/core/time_span.js");
           getPolishForm(c)
         ];
       },
-      decimal: ",",
+      decimal: ","
     },
     pt: {
       y: function (c) {
@@ -6959,7 +7224,7 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return "milissegundo" + (c === 1 ? "" : "s");
       },
-      decimal: ",",
+      decimal: ","
     },
     ro: {
       y: function (c) {
@@ -6986,7 +7251,7 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return c === 1 ? "milisecundă" : "milisecunde";
       },
-      decimal: ",",
+      decimal: ","
     },
     ru: {
       y: function (c) {
@@ -7015,7 +7280,105 @@ require("./src/core/time_span.js");
           getSlavicForm(c)
         ];
       },
-      decimal: ",",
+      decimal: ","
+    },
+    sq: {
+      y: function (c) {
+        return c === 1 ? "vit" : "vjet";
+      },
+      mo: "muaj",
+      w: "javë",
+      d: "ditë",
+      h: "orë",
+      m: function (c) {
+        return "minut" + (c === 1 ? "ë" : "a");
+      },
+      s: function (c) {
+        return "sekond" + (c === 1 ? "ë" : "a");
+      },
+      ms: function (c) {
+        return "milisekond" + (c === 1 ? "ë" : "a");
+      },
+      decimal: ","
+    },
+    sr: {
+      y: function (c) {
+        return ["години", "година", "године"][getSlavicForm(c)];
+      },
+      mo: function (c) {
+        return ["месеци", "месец", "месеца"][getSlavicForm(c)];
+      },
+      w: function (c) {
+        return ["недељи", "недеља", "недеље"][getSlavicForm(c)];
+      },
+      d: function (c) {
+        return ["дани", "дан", "дана"][getSlavicForm(c)];
+      },
+      h: function (c) {
+        return ["сати", "сат", "сата"][getSlavicForm(c)];
+      },
+      m: function (c) {
+        return ["минута", "минут", "минута"][getSlavicForm(c)];
+      },
+      s: function (c) {
+        return ["секунди", "секунда", "секунде"][getSlavicForm(c)];
+      },
+      ms: function (c) {
+        return ["милисекунди", "милисекунда", "милисекунде"][getSlavicForm(c)];
+      },
+      decimal: ","
+    },
+    ta: {
+      y: function (c) {
+        return c === 1 ? "வருடம்" : "ஆண்டுகள்";
+      },
+      mo: function (c) {
+        return c === 1 ? "மாதம்" : "மாதங்கள்";
+      },
+      w: function (c) {
+        return c === 1 ? "வாரம்" : "வாரங்கள்";
+      },
+      d: function (c) {
+        return c === 1 ? "நாள்" : "நாட்கள்";
+      },
+      h: function (c) {
+        return c === 1 ? "மணி" : "மணிநேரம்";
+      },
+      m: function (c) {
+        return "நிமிட" + (c === 1 ? "ம்" : "ங்கள்");
+      },
+      s: function (c) {
+        return "வினாடி" + (c === 1 ? "" : "கள்");
+      },
+      ms: function (c) {
+        return "மில்லி விநாடி" + (c === 1 ? "" : "கள்");
+      }
+    },
+    te: {
+      y: function (c) {
+        return "సంవత్స" + (c === 1 ? "రం" : "రాల");
+      },
+      mo: function (c) {
+        return "నెల" + (c === 1 ? "" : "ల");
+      },
+      w: function (c) {
+        return c === 1 ? "వారం" : "వారాలు";
+      },
+      d: function (c) {
+        return "రోజు" + (c === 1 ? "" : "లు");
+      },
+      h: function (c) {
+        return "గంట" + (c === 1 ? "" : "లు");
+      },
+      m: function (c) {
+        return c === 1 ? "నిమిషం" : "నిమిషాలు";
+      },
+      s: function (c) {
+        return c === 1 ? "సెకను" : "సెకన్లు";
+      },
+      ms: function (c) {
+        return c === 1 ? "మిల్లీసెకన్" : "మిల్లీసెకన్లు";
+      }
     },
     uk: {
       y: function (c) {
@@ -7042,7 +7405,7 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return ["мілісекунд", "мілісекунда", "мілісекунди"][getSlavicForm(c)];
       },
-      decimal: ",",
+      decimal: ","
     },
     ur: {
       y: "سال",
@@ -7059,7 +7422,7 @@ require("./src/core/time_span.js");
       m: "منٹ",
       s: "سیکنڈ",
       ms: "ملی سیکنڈ",
-      decimal: ".",
+      decimal: "."
     },
     sk: {
       y: function (c) {
@@ -7094,7 +7457,98 @@ require("./src/core/time_span.js");
           getCzechOrSlovakForm(c)
         ];
       },
-      decimal: ",",
+      decimal: ","
+    },
+    sl: {
+      y: function (c) {
+        if (c % 10 === 1) {
+          return "leto";
+        } else if (c % 100 === 2) {
+          return "leti";
+        } else if (
+          c % 100 === 3 ||
+          c % 100 === 4 ||
+          (Math.floor(c) !== c && c % 100 <= 5)
+        ) {
+          return "leta";
+        } else {
+          return "let";
+        }
+      },
+      mo: function (c) {
+        if (c % 10 === 1) {
+          return "mesec";
+        } else if (c % 100 === 2 || (Math.floor(c) !== c && c % 100 <= 5)) {
+          return "meseca";
+        } else if (c % 10 === 3 || c % 10 === 4) {
+          return "mesece";
+        } else {
+          return "mesecev";
+        }
+      },
+      w: function (c) {
+        if (c % 10 === 1) {
+          return "teden";
+        } else if (c % 10 === 2 || (Math.floor(c) !== c && c % 100 <= 4)) {
+          return "tedna";
+        } else if (c % 10 === 3 || c % 10 === 4) {
+          return "tedne";
+        } else {
+          return "tednov";
+        }
+      },
+      d: function (c) {
+        return c % 100 === 1 ? "dan" : "dni";
+      },
+      h: function (c) {
+        if (c % 10 === 1) {
+          return "ura";
+        } else if (c % 100 === 2) {
+          return "uri";
+        } else if (c % 10 === 3 || c % 10 === 4 || Math.floor(c) !== c) {
+          return "ure";
+        } else {
+          return "ur";
+        }
+      },
+      m: function (c) {
+        if (c % 10 === 1) {
+          return "minuta";
+        } else if (c % 10 === 2) {
+          return "minuti";
+        } else if (
+          c % 10 === 3 ||
+          c % 10 === 4 ||
+          (Math.floor(c) !== c && c % 100 <= 4)
+        ) {
+          return "minute";
+        } else {
+          return "minut";
+        }
+      },
+      s: function (c) {
+        if (c % 10 === 1) {
+          return "sekunda";
+        } else if (c % 100 === 2) {
+          return "sekundi";
+        } else if (c % 100 === 3 || c % 100 === 4 || Math.floor(c) !== c) {
+          return "sekunde";
+        } else {
+          return "sekund";
+        }
+      },
+      ms: function (c) {
+        if (c % 10 === 1) {
+          return "milisekunda";
+        } else if (c % 100 === 2) {
+          return "milisekundi";
+        } else if (c % 100 === 3 || c % 100 === 4 || Math.floor(c) !== c) {
+          return "milisekunde";
+        } else {
+          return "milisekund";
+        }
+      },
+      decimal: ","
     },
     sv: {
       y: "år",
@@ -7119,7 +7573,7 @@ require("./src/core/time_span.js");
       ms: function (c) {
         return "millisekund" + (c === 1 ? "" : "er");
       },
-      decimal: ",",
+      decimal: ","
     },
     sw: {
       y: function (c) {
@@ -7138,7 +7592,7 @@ require("./src/core/time_span.js");
       m: "dakika",
       s: "sekunde",
       ms: "milisekunde",
-      decimal: ".",
+      decimal: "."
     },
     tr: {
       y: "yıl",
@@ -7149,18 +7603,18 @@ require("./src/core/time_span.js");
       m: "dakika",
       s: "saniye",
       ms: "milisaniye",
-      decimal: ",",
+      decimal: ","
     },
     th: {
       y: "ปี",
       mo: "เดือน",
-      w: "อาทิตย์",
+      w: "สัปดาห์",
       d: "วัน",
       h: "ชั่วโมง",
       m: "นาที",
       s: "วินาที",
       ms: "มิลลิวินาที",
-      decimal: ".",
+      decimal: "."
     },
     vi: {
       y: "năm",
@@ -7171,7 +7625,7 @@ require("./src/core/time_span.js");
       m: "phút",
       s: "giây",
       ms: "mili giây",
-      decimal: ",",
+      decimal: ","
     },
     zh_CN: {
       y: "年",
@@ -7182,7 +7636,7 @@ require("./src/core/time_span.js");
       m: "分钟",
       s: "秒",
       ms: "毫秒",
-      decimal: ".",
+      decimal: "."
     },
     zh_TW: {
       y: "年",
@@ -7193,23 +7647,22 @@ require("./src/core/time_span.js");
       m: "分鐘",
       s: "秒",
       ms: "毫秒",
-      decimal: ".",
-    },
+      decimal: "."
+    }
   };
 
   // You can create a humanizer, which returns a function with default
   // parameters.
   function humanizer(passedOptions) {
     var result = function humanizer(ms, humanizerOptions) {
-      var options = extend({}, result, humanizerOptions || {});
+      var options = assign({}, result, humanizerOptions || {});
       return doHumanization(ms, options);
     };
 
-    return extend(
+    return assign(
       result,
       {
         language: "en",
-        delimiter: ", ",
         spacer: " ",
         conjunction: "",
         serialComma: true,
@@ -7224,8 +7677,8 @@ require("./src/core/time_span.js");
           h: 3600000,
           m: 60000,
           s: 1000,
-          ms: 1,
-        },
+          ms: 1
+        }
       },
       passedOptions
     );
@@ -7296,7 +7749,7 @@ require("./src/core/time_span.js");
       // Add the string.
       pieces.push({
         unitCount: unitCount,
-        unitName: unitName,
+        unitName: unitName
       });
 
       // Remove what we just figured out.
@@ -7351,13 +7804,22 @@ require("./src/core/time_span.js");
     }
 
     if (result.length) {
+      var delimiter;
+      if (has(options, "delimiter")) {
+        delimiter = options.delimiter;
+      } else if (has(dictionary, "delimiter")) {
+        delimiter = dictionary.delimiter;
+      } else {
+        delimiter = ", ";
+      }
+
       if (!options.conjunction || result.length === 1) {
-        return result.join(options.delimiter);
+        return result.join(delimiter);
       } else if (result.length === 2) {
         return result.join(options.conjunction);
       } else if (result.length > 2) {
         return (
-          result.slice(0, -1).join(options.delimiter) +
+          result.slice(0, -1).join(delimiter) +
           (options.serialComma ? "," : "") +
           options.conjunction +
           result.slice(-1)
@@ -7383,7 +7845,12 @@ require("./src/core/time_span.js");
       decimal = ".";
     }
 
-    var countStr = count.toString().replace(".", decimal);
+    var countStr;
+    if (typeof dictionary._formatCount === "function") {
+      countStr = dictionary._formatCount(count, decimal);
+    } else {
+      countStr = count.toString().replace(".", decimal);
+    }
 
     var dictionaryValue = dictionary[type];
     var word;
@@ -7396,7 +7863,7 @@ require("./src/core/time_span.js");
     return countStr + options.spacer + word;
   }
 
-  function extend(destination) {
+  function assign(destination) {
     var source;
     for (var i = 1; i < arguments.length; i++) {
       source = arguments[i];
@@ -7409,7 +7876,19 @@ require("./src/core/time_span.js");
     return destination;
   }
 
-  // Internal helper function for Polish language.
+  function getArabicForm(c) {
+    if (c === 1) {
+      return 0;
+    }
+    if (c === 2) {
+      return 1;
+    }
+    if (c > 2 && c < 11) {
+      return 2;
+    }
+    return 0;
+  }
+
   function getPolishForm(c) {
     if (c === 1) {
       return 0;
@@ -7422,7 +7901,6 @@ require("./src/core/time_span.js");
     }
   }
 
-  // Internal helper function for Russian and Ukranian languages.
   function getSlavicForm(c) {
     if (Math.floor(c) !== c) {
       return 2;
@@ -7441,7 +7919,6 @@ require("./src/core/time_span.js");
     }
   }
 
-  // Internal helper function for Slovak language.
   function getCzechOrSlovakForm(c) {
     if (c === 1) {
       return 0;
@@ -7454,7 +7931,6 @@ require("./src/core/time_span.js");
     }
   }
 
-  // Internal helper function for Lithuanian language.
   function getLithuanianForm(c) {
     if (c === 1 || (c % 10 === 1 && c % 100 > 20)) {
       return 0;
@@ -7469,7 +7945,6 @@ require("./src/core/time_span.js");
     }
   }
 
-  // Internal helper function for Latvian language.
   function getLatvianForm(c) {
     return c % 10 === 1 && c % 100 !== 11;
   }
@@ -7507,9 +7982,9 @@ require("./src/core/time_span.js");
   } else {
     this.humanizeDuration = humanizeDuration;
   }
-})(); // eslint-disable-line semi
+})();
 
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 
 /**
  * Expose `isUrl`.
@@ -7558,7 +8033,7 @@ function isUrl(string){
   return false;
 }
 
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 /**
  * jQuery contextMenu v2.9.2 - Plugin for simple contextMenu handling
  *
@@ -9694,19 +10169,19 @@ function isUrl(string){
     $.contextMenu.menus = menus;
 });
 
-},{"jquery":18}],18:[function(require,module,exports){
+},{"jquery":19}],19:[function(require,module,exports){
 /*!
- * jQuery JavaScript Library v3.5.1
+ * jQuery JavaScript Library v3.6.0
  * https://jquery.com/
  *
  * Includes Sizzle.js
  * https://sizzlejs.com/
  *
- * Copyright JS Foundation and other contributors
+ * Copyright OpenJS Foundation and other contributors
  * Released under the MIT license
  * https://jquery.org/license
  *
- * Date: 2020-05-04T22:49Z
+ * Date: 2021-03-02T17:08Z
  */
 ( function( global, factory ) {
 
@@ -9773,12 +10248,16 @@ var support = {};
 
 var isFunction = function isFunction( obj ) {
 
-      // Support: Chrome <=57, Firefox <=52
-      // In some browsers, typeof returns "function" for HTML <object> elements
-      // (i.e., `typeof document.createElement( "object" ) === "function"`).
-      // We don't want to classify *any* DOM node as a function.
-      return typeof obj === "function" && typeof obj.nodeType !== "number";
-  };
+		// Support: Chrome <=57, Firefox <=52
+		// In some browsers, typeof returns "function" for HTML <object> elements
+		// (i.e., `typeof document.createElement( "object" ) === "function"`).
+		// We don't want to classify *any* DOM node as a function.
+		// Support: QtWeb <=3.8.5, WebKit <=534.34, wkhtmltopdf tool <=0.12.5
+		// Plus for old WebKit, typeof returns "function" for HTML collections
+		// (e.g., `typeof document.getElementsByTagName("div") === "function"`). (gh-4756)
+		return typeof obj === "function" && typeof obj.nodeType !== "number" &&
+			typeof obj.item !== "function";
+	};
 
 
 var isWindow = function isWindow( obj ) {
@@ -9844,7 +10323,7 @@ function toType( obj ) {
 
 
 var
-	version = "3.5.1",
+	version = "3.6.0",
 
 	// Define a local copy of jQuery
 	jQuery = function( selector, context ) {
@@ -10098,7 +10577,7 @@ jQuery.extend( {
 			if ( isArrayLike( Object( arr ) ) ) {
 				jQuery.merge( ret,
 					typeof arr === "string" ?
-					[ arr ] : arr
+						[ arr ] : arr
 				);
 			} else {
 				push.call( ret, arr );
@@ -10193,9 +10672,9 @@ if ( typeof Symbol === "function" ) {
 
 // Populate the class2type map
 jQuery.each( "Boolean Number String Function Array Date RegExp Object Error Symbol".split( " " ),
-function( _i, name ) {
-	class2type[ "[object " + name + "]" ] = name.toLowerCase();
-} );
+	function( _i, name ) {
+		class2type[ "[object " + name + "]" ] = name.toLowerCase();
+	} );
 
 function isArrayLike( obj ) {
 
@@ -10215,14 +10694,14 @@ function isArrayLike( obj ) {
 }
 var Sizzle =
 /*!
- * Sizzle CSS Selector Engine v2.3.5
+ * Sizzle CSS Selector Engine v2.3.6
  * https://sizzlejs.com/
  *
  * Copyright JS Foundation and other contributors
  * Released under the MIT license
  * https://js.foundation/
  *
- * Date: 2020-03-14
+ * Date: 2021-02-16
  */
 ( function( window ) {
 var i,
@@ -10805,8 +11284,8 @@ support = Sizzle.support = {};
  * @returns {Boolean} True iff elem is a non-HTML XML node
  */
 isXML = Sizzle.isXML = function( elem ) {
-	var namespace = elem.namespaceURI,
-		docElem = ( elem.ownerDocument || elem ).documentElement;
+	var namespace = elem && elem.namespaceURI,
+		docElem = elem && ( elem.ownerDocument || elem ).documentElement;
 
 	// Support: IE <=8
 	// Assume HTML when documentElement doesn't yet exist, such as inside loading iframes
@@ -12721,9 +13200,9 @@ var rneedsContext = jQuery.expr.match.needsContext;
 
 function nodeName( elem, name ) {
 
-  return elem.nodeName && elem.nodeName.toLowerCase() === name.toLowerCase();
+	return elem.nodeName && elem.nodeName.toLowerCase() === name.toLowerCase();
 
-};
+}
 var rsingleTag = ( /^<([a-z][^\/\0>:\x20\t\r\n\f]*)[\x20\t\r\n\f]*\/?>(?:<\/\1>|)$/i );
 
 
@@ -13694,8 +14173,8 @@ jQuery.extend( {
 			resolveContexts = Array( i ),
 			resolveValues = slice.call( arguments ),
 
-			// the master Deferred
-			master = jQuery.Deferred(),
+			// the primary Deferred
+			primary = jQuery.Deferred(),
 
 			// subordinate callback factory
 			updateFunc = function( i ) {
@@ -13703,30 +14182,30 @@ jQuery.extend( {
 					resolveContexts[ i ] = this;
 					resolveValues[ i ] = arguments.length > 1 ? slice.call( arguments ) : value;
 					if ( !( --remaining ) ) {
-						master.resolveWith( resolveContexts, resolveValues );
+						primary.resolveWith( resolveContexts, resolveValues );
 					}
 				};
 			};
 
 		// Single- and empty arguments are adopted like Promise.resolve
 		if ( remaining <= 1 ) {
-			adoptValue( singleValue, master.done( updateFunc( i ) ).resolve, master.reject,
+			adoptValue( singleValue, primary.done( updateFunc( i ) ).resolve, primary.reject,
 				!remaining );
 
 			// Use .then() to unwrap secondary thenables (cf. gh-3000)
-			if ( master.state() === "pending" ||
+			if ( primary.state() === "pending" ||
 				isFunction( resolveValues[ i ] && resolveValues[ i ].then ) ) {
 
-				return master.then();
+				return primary.then();
 			}
 		}
 
 		// Multiple arguments are aggregated like Promise.all array elements
 		while ( i-- ) {
-			adoptValue( resolveValues[ i ], updateFunc( i ), master.reject );
+			adoptValue( resolveValues[ i ], updateFunc( i ), primary.reject );
 		}
 
-		return master.promise();
+		return primary.promise();
 	}
 } );
 
@@ -13877,8 +14356,8 @@ var access = function( elems, fn, key, value, chainable, emptyGet, raw ) {
 			for ( ; i < len; i++ ) {
 				fn(
 					elems[ i ], key, raw ?
-					value :
-					value.call( elems[ i ], i, fn( elems[ i ], key ) )
+						value :
+						value.call( elems[ i ], i, fn( elems[ i ], key ) )
 				);
 			}
 		}
@@ -14786,10 +15265,7 @@ function buildFragment( elems, context, scripts, selection, ignored ) {
 }
 
 
-var
-	rkeyEvent = /^key/,
-	rmouseEvent = /^(?:mouse|pointer|contextmenu|drag|drop)|click/,
-	rtypenamespace = /^([^.]*)(?:\.(.+)|)/;
+var rtypenamespace = /^([^.]*)(?:\.(.+)|)/;
 
 function returnTrue() {
 	return true;
@@ -15084,8 +15560,8 @@ jQuery.event = {
 			event = jQuery.event.fix( nativeEvent ),
 
 			handlers = (
-					dataPriv.get( this, "events" ) || Object.create( null )
-				)[ event.type ] || [],
+				dataPriv.get( this, "events" ) || Object.create( null )
+			)[ event.type ] || [],
 			special = jQuery.event.special[ event.type ] || {};
 
 		// Use the fix-ed jQuery.Event rather than the (read-only) native event
@@ -15209,12 +15685,12 @@ jQuery.event = {
 			get: isFunction( hook ) ?
 				function() {
 					if ( this.originalEvent ) {
-							return hook( this.originalEvent );
+						return hook( this.originalEvent );
 					}
 				} :
 				function() {
 					if ( this.originalEvent ) {
-							return this.originalEvent[ name ];
+						return this.originalEvent[ name ];
 					}
 				},
 
@@ -15353,7 +15829,13 @@ function leverageNative( el, type, expectSync ) {
 						// Cancel the outer synthetic event
 						event.stopImmediatePropagation();
 						event.preventDefault();
-						return result.value;
+
+						// Support: Chrome 86+
+						// In Chrome, if an element having a focusout handler is blurred by
+						// clicking outside of it, it invokes the handler synchronously. If
+						// that handler calls `.remove()` on the element, the data is cleared,
+						// leaving `result` undefined. We need to guard against this.
+						return result && result.value;
 					}
 
 				// If this is an inner synthetic event for an event with a bubbling surrogate
@@ -15518,34 +16000,7 @@ jQuery.each( {
 	targetTouches: true,
 	toElement: true,
 	touches: true,
-
-	which: function( event ) {
-		var button = event.button;
-
-		// Add which for key events
-		if ( event.which == null && rkeyEvent.test( event.type ) ) {
-			return event.charCode != null ? event.charCode : event.keyCode;
-		}
-
-		// Add which for click: 1 === left; 2 === middle; 3 === right
-		if ( !event.which && button !== undefined && rmouseEvent.test( event.type ) ) {
-			if ( button & 1 ) {
-				return 1;
-			}
-
-			if ( button & 2 ) {
-				return 3;
-			}
-
-			if ( button & 4 ) {
-				return 2;
-			}
-
-			return 0;
-		}
-
-		return event.which;
-	}
+	which: true
 }, jQuery.event.addProp );
 
 jQuery.each( { focus: "focusin", blur: "focusout" }, function( type, delegateType ) {
@@ -15568,6 +16023,12 @@ jQuery.each( { focus: "focusin", blur: "focusout" }, function( type, delegateTyp
 			leverageNative( this, type );
 
 			// Return non-false to allow normal event-path propagation
+			return true;
+		},
+
+		// Suppress native focus or blur as it's already being fired
+		// in leverageNative.
+		_default: function() {
 			return true;
 		},
 
@@ -16238,6 +16699,10 @@ var rboxStyle = new RegExp( cssExpand.join( "|" ), "i" );
 		// set in CSS while `offset*` properties report correct values.
 		// Behavior in IE 9 is more subtle than in newer versions & it passes
 		// some versions of this test; make sure not to make it pass there!
+		//
+		// Support: Firefox 70+
+		// Only Firefox includes border widths
+		// in computed dimensions. (gh-4529)
 		reliableTrDimensions: function() {
 			var table, tr, trChild, trStyle;
 			if ( reliableTrDimensionsVal == null ) {
@@ -16245,9 +16710,22 @@ var rboxStyle = new RegExp( cssExpand.join( "|" ), "i" );
 				tr = document.createElement( "tr" );
 				trChild = document.createElement( "div" );
 
-				table.style.cssText = "position:absolute;left:-11111px";
+				table.style.cssText = "position:absolute;left:-11111px;border-collapse:separate";
+				tr.style.cssText = "border:1px solid";
+
+				// Support: Chrome 86+
+				// Height set through cssText does not get applied.
+				// Computed height then comes back as 0.
 				tr.style.height = "1px";
 				trChild.style.height = "9px";
+
+				// Support: Android 8 Chrome 86+
+				// In our bodyBackground.html iframe,
+				// display for all div elements is set to "inline",
+				// which causes a problem only in Android 8 Chrome 86.
+				// Ensuring the div is display: block
+				// gets around this issue.
+				trChild.style.display = "block";
 
 				documentElement
 					.appendChild( table )
@@ -16255,7 +16733,9 @@ var rboxStyle = new RegExp( cssExpand.join( "|" ), "i" );
 					.appendChild( trChild );
 
 				trStyle = window.getComputedStyle( tr );
-				reliableTrDimensionsVal = parseInt( trStyle.height ) > 3;
+				reliableTrDimensionsVal = ( parseInt( trStyle.height, 10 ) +
+					parseInt( trStyle.borderTopWidth, 10 ) +
+					parseInt( trStyle.borderBottomWidth, 10 ) ) === tr.offsetHeight;
 
 				documentElement.removeChild( table );
 			}
@@ -16719,10 +17199,10 @@ jQuery.each( [ "height", "width" ], function( _i, dimension ) {
 					// Running getBoundingClientRect on a disconnected node
 					// in IE throws an error.
 					( !elem.getClientRects().length || !elem.getBoundingClientRect().width ) ?
-						swap( elem, cssShow, function() {
-							return getWidthOrHeight( elem, dimension, extra );
-						} ) :
-						getWidthOrHeight( elem, dimension, extra );
+					swap( elem, cssShow, function() {
+						return getWidthOrHeight( elem, dimension, extra );
+					} ) :
+					getWidthOrHeight( elem, dimension, extra );
 			}
 		},
 
@@ -16781,7 +17261,7 @@ jQuery.cssHooks.marginLeft = addGetHookIf( support.reliableMarginLeft,
 					swap( elem, { marginLeft: 0 }, function() {
 						return elem.getBoundingClientRect().left;
 					} )
-				) + "px";
+			) + "px";
 		}
 	}
 );
@@ -16920,7 +17400,7 @@ Tween.propHooks = {
 			if ( jQuery.fx.step[ tween.prop ] ) {
 				jQuery.fx.step[ tween.prop ]( tween );
 			} else if ( tween.elem.nodeType === 1 && (
-					jQuery.cssHooks[ tween.prop ] ||
+				jQuery.cssHooks[ tween.prop ] ||
 					tween.elem.style[ finalPropName( tween.prop ) ] != null ) ) {
 				jQuery.style( tween.elem, tween.prop, tween.now + tween.unit );
 			} else {
@@ -17165,7 +17645,7 @@ function defaultPrefilter( elem, props, opts ) {
 
 			anim.done( function() {
 
-			/* eslint-enable no-loop-func */
+				/* eslint-enable no-loop-func */
 
 				// The final step of a "hide" animation is actually hiding the element
 				if ( !hidden ) {
@@ -17285,7 +17765,7 @@ function Animation( elem, properties, options ) {
 			tweens: [],
 			createTween: function( prop, end ) {
 				var tween = jQuery.Tween( elem, animation.opts, prop, end,
-						animation.opts.specialEasing[ prop ] || animation.opts.easing );
+					animation.opts.specialEasing[ prop ] || animation.opts.easing );
 				animation.tweens.push( tween );
 				return tween;
 			},
@@ -17458,7 +17938,8 @@ jQuery.fn.extend( {
 					anim.stop( true );
 				}
 			};
-			doAnimation.finish = doAnimation;
+
+		doAnimation.finish = doAnimation;
 
 		return empty || optall.queue === false ?
 			this.each( doAnimation ) :
@@ -18098,8 +18579,8 @@ jQuery.fn.extend( {
 				if ( this.setAttribute ) {
 					this.setAttribute( "class",
 						className || value === false ?
-						"" :
-						dataPriv.get( this, "__className__" ) || ""
+							"" :
+							dataPriv.get( this, "__className__" ) || ""
 					);
 				}
 			}
@@ -18114,7 +18595,7 @@ jQuery.fn.extend( {
 		while ( ( elem = this[ i++ ] ) ) {
 			if ( elem.nodeType === 1 &&
 				( " " + stripAndCollapse( getClass( elem ) ) + " " ).indexOf( className ) > -1 ) {
-					return true;
+				return true;
 			}
 		}
 
@@ -18404,9 +18885,7 @@ jQuery.extend( jQuery.event, {
 				special.bindType || type;
 
 			// jQuery handler
-			handle = (
-					dataPriv.get( cur, "events" ) || Object.create( null )
-				)[ event.type ] &&
+			handle = ( dataPriv.get( cur, "events" ) || Object.create( null ) )[ event.type ] &&
 				dataPriv.get( cur, "handle" );
 			if ( handle ) {
 				handle.apply( cur, data );
@@ -18553,7 +19032,7 @@ var rquery = ( /\?/ );
 
 // Cross-browser xml parsing
 jQuery.parseXML = function( data ) {
-	var xml;
+	var xml, parserErrorElem;
 	if ( !data || typeof data !== "string" ) {
 		return null;
 	}
@@ -18562,12 +19041,17 @@ jQuery.parseXML = function( data ) {
 	// IE throws on parseFromString with invalid input.
 	try {
 		xml = ( new window.DOMParser() ).parseFromString( data, "text/xml" );
-	} catch ( e ) {
-		xml = undefined;
-	}
+	} catch ( e ) {}
 
-	if ( !xml || xml.getElementsByTagName( "parsererror" ).length ) {
-		jQuery.error( "Invalid XML: " + data );
+	parserErrorElem = xml && xml.getElementsByTagName( "parsererror" )[ 0 ];
+	if ( !xml || parserErrorElem ) {
+		jQuery.error( "Invalid XML: " + (
+			parserErrorElem ?
+				jQuery.map( parserErrorElem.childNodes, function( el ) {
+					return el.textContent;
+				} ).join( "\n" ) :
+				data
+		) );
 	}
 	return xml;
 };
@@ -18668,16 +19152,14 @@ jQuery.fn.extend( {
 			// Can add propHook for "elements" to filter or add form elements
 			var elements = jQuery.prop( this, "elements" );
 			return elements ? jQuery.makeArray( elements ) : this;
-		} )
-		.filter( function() {
+		} ).filter( function() {
 			var type = this.type;
 
 			// Use .is( ":disabled" ) so that fieldset[disabled] works
 			return this.name && !jQuery( this ).is( ":disabled" ) &&
 				rsubmittable.test( this.nodeName ) && !rsubmitterTypes.test( type ) &&
 				( this.checked || !rcheckableType.test( type ) );
-		} )
-		.map( function( _i, elem ) {
+		} ).map( function( _i, elem ) {
 			var val = jQuery( this ).val();
 
 			if ( val == null ) {
@@ -18730,7 +19212,8 @@ var
 
 	// Anchor tag for parsing the document origin
 	originAnchor = document.createElement( "a" );
-	originAnchor.href = location.href;
+
+originAnchor.href = location.href;
 
 // Base "constructor" for jQuery.ajaxPrefilter and jQuery.ajaxTransport
 function addToPrefiltersOrTransports( structure ) {
@@ -19111,8 +19594,8 @@ jQuery.extend( {
 			// Context for global events is callbackContext if it is a DOM node or jQuery collection
 			globalEventContext = s.context &&
 				( callbackContext.nodeType || callbackContext.jquery ) ?
-					jQuery( callbackContext ) :
-					jQuery.event,
+				jQuery( callbackContext ) :
+				jQuery.event,
 
 			// Deferreds
 			deferred = jQuery.Deferred(),
@@ -19424,8 +19907,10 @@ jQuery.extend( {
 				response = ajaxHandleResponses( s, jqXHR, responses );
 			}
 
-			// Use a noop converter for missing script
-			if ( !isSuccess && jQuery.inArray( "script", s.dataTypes ) > -1 ) {
+			// Use a noop converter for missing script but not if jsonp
+			if ( !isSuccess &&
+				jQuery.inArray( "script", s.dataTypes ) > -1 &&
+				jQuery.inArray( "json", s.dataTypes ) < 0 ) {
 				s.converters[ "text script" ] = function() {};
 			}
 
@@ -20163,12 +20648,6 @@ jQuery.offset = {
 			options.using.call( elem, props );
 
 		} else {
-			if ( typeof props.top === "number" ) {
-				props.top += "px";
-			}
-			if ( typeof props.left === "number" ) {
-				props.left += "px";
-			}
 			curElem.css( props );
 		}
 	}
@@ -20337,8 +20816,11 @@ jQuery.each( [ "top", "left" ], function( _i, prop ) {
 
 // Create innerHeight, innerWidth, height, width, outerHeight and outerWidth methods
 jQuery.each( { Height: "height", Width: "width" }, function( name, type ) {
-	jQuery.each( { padding: "inner" + name, content: type, "": "outer" + name },
-		function( defaultExtra, funcName ) {
+	jQuery.each( {
+		padding: "inner" + name,
+		content: type,
+		"": "outer" + name
+	}, function( defaultExtra, funcName ) {
 
 		// Margin is only for outerHeight, outerWidth
 		jQuery.fn[ funcName ] = function( margin, value ) {
@@ -20423,7 +20905,8 @@ jQuery.fn.extend( {
 	}
 } );
 
-jQuery.each( ( "blur focus focusin focusout resize scroll click dblclick " +
+jQuery.each(
+	( "blur focus focusin focusout resize scroll click dblclick " +
 	"mousedown mouseup mousemove mouseover mouseout mouseenter mouseleave " +
 	"change select submit keydown keypress keyup contextmenu" ).split( " " ),
 	function( _i, name ) {
@@ -20434,7 +20917,8 @@ jQuery.each( ( "blur focus focusin focusout resize scroll click dblclick " +
 				this.on( name, null, data, fn ) :
 				this.trigger( name );
 		};
-	} );
+	}
+);
 
 
 
@@ -20568,7 +21052,7 @@ if ( typeof noGlobal === "undefined" ) {
 return jQuery;
 } );
 
-},{}],19:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -20754,7 +21238,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],20:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   module.exports = {
@@ -20768,7 +21252,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{}],21:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   module.exports = {
@@ -20795,7 +21279,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{}],22:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   // Copies all enumerable own properties from `sources` to `target`
@@ -20885,7 +21369,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{}],23:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   module.exports = {
@@ -20897,7 +21381,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{}],24:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLAttribute, XMLNode;
@@ -21029,7 +21513,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./XMLNode":43}],25:[function(require,module,exports){
+},{"./NodeType":22,"./XMLNode":44}],26:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLCData, XMLCharacterData;
@@ -21072,7 +21556,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./XMLCharacterData":26}],26:[function(require,module,exports){
+},{"./NodeType":22,"./XMLCharacterData":27}],27:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var XMLCharacterData, XMLNode;
@@ -21160,7 +21644,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./XMLNode":43}],27:[function(require,module,exports){
+},{"./XMLNode":44}],28:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLCharacterData, XMLComment;
@@ -21203,7 +21687,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./XMLCharacterData":26}],28:[function(require,module,exports){
+},{"./NodeType":22,"./XMLCharacterData":27}],29:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var XMLDOMConfiguration, XMLDOMErrorHandler, XMLDOMStringList;
@@ -21285,7 +21769,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./XMLDOMErrorHandler":29,"./XMLDOMStringList":31}],29:[function(require,module,exports){
+},{"./XMLDOMErrorHandler":30,"./XMLDOMStringList":32}],30:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   // Represents the error handler for DOM operations
@@ -21307,7 +21791,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{}],30:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   // Implements the DOMImplementation interface
@@ -21364,7 +21848,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{}],31:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   // Represents a list of string entries
@@ -21410,7 +21894,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{}],32:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLDTDAttList, XMLNode;
@@ -21478,7 +21962,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./XMLNode":43}],33:[function(require,module,exports){
+},{"./NodeType":22,"./XMLNode":44}],34:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLDTDElement, XMLNode;
@@ -21524,7 +22008,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./XMLNode":43}],34:[function(require,module,exports){
+},{"./NodeType":22,"./XMLNode":44}],35:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLDTDEntity, XMLNode, isObject;
@@ -21641,7 +22125,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./Utility":22,"./XMLNode":43}],35:[function(require,module,exports){
+},{"./NodeType":22,"./Utility":23,"./XMLNode":44}],36:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLDTDNotation, XMLNode;
@@ -21709,7 +22193,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./XMLNode":43}],36:[function(require,module,exports){
+},{"./NodeType":22,"./XMLNode":44}],37:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLDeclaration, XMLNode, isObject;
@@ -21762,7 +22246,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./Utility":22,"./XMLNode":43}],37:[function(require,module,exports){
+},{"./NodeType":22,"./Utility":23,"./XMLNode":44}],38:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLDTDAttList, XMLDTDElement, XMLDTDEntity, XMLDTDNotation, XMLDocType, XMLNamedNodeMap, XMLNode, isObject;
@@ -21999,7 +22483,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./Utility":22,"./XMLDTDAttList":32,"./XMLDTDElement":33,"./XMLDTDEntity":34,"./XMLDTDNotation":35,"./XMLNamedNodeMap":42,"./XMLNode":43}],38:[function(require,module,exports){
+},{"./NodeType":22,"./Utility":23,"./XMLDTDAttList":33,"./XMLDTDElement":34,"./XMLDTDEntity":35,"./XMLDTDNotation":36,"./XMLNamedNodeMap":43,"./XMLNode":44}],39:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLDOMConfiguration, XMLDOMImplementation, XMLDocument, XMLNode, XMLStringWriter, XMLStringifier, isPlainObject;
@@ -22283,7 +22767,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./Utility":22,"./XMLDOMConfiguration":28,"./XMLDOMImplementation":30,"./XMLNode":43,"./XMLStringWriter":48,"./XMLStringifier":49}],39:[function(require,module,exports){
+},{"./NodeType":22,"./Utility":23,"./XMLDOMConfiguration":29,"./XMLDOMImplementation":31,"./XMLNode":44,"./XMLStringWriter":49,"./XMLStringifier":50}],40:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, WriterState, XMLAttribute, XMLCData, XMLComment, XMLDTDAttList, XMLDTDElement, XMLDTDEntity, XMLDTDNotation, XMLDeclaration, XMLDocType, XMLDocument, XMLDocumentCB, XMLElement, XMLProcessingInstruction, XMLRaw, XMLStringWriter, XMLStringifier, XMLText, getValue, isFunction, isObject, isPlainObject,
@@ -22935,7 +23419,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./Utility":22,"./WriterState":23,"./XMLAttribute":24,"./XMLCData":25,"./XMLComment":27,"./XMLDTDAttList":32,"./XMLDTDElement":33,"./XMLDTDEntity":34,"./XMLDTDNotation":35,"./XMLDeclaration":36,"./XMLDocType":37,"./XMLDocument":38,"./XMLElement":41,"./XMLProcessingInstruction":45,"./XMLRaw":46,"./XMLStringWriter":48,"./XMLStringifier":49,"./XMLText":50}],40:[function(require,module,exports){
+},{"./NodeType":22,"./Utility":23,"./WriterState":24,"./XMLAttribute":25,"./XMLCData":26,"./XMLComment":28,"./XMLDTDAttList":33,"./XMLDTDElement":34,"./XMLDTDEntity":35,"./XMLDTDNotation":36,"./XMLDeclaration":37,"./XMLDocType":38,"./XMLDocument":39,"./XMLElement":42,"./XMLProcessingInstruction":46,"./XMLRaw":47,"./XMLStringWriter":49,"./XMLStringifier":50,"./XMLText":51}],41:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLDummy, XMLNode;
@@ -22976,7 +23460,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./XMLNode":43}],41:[function(require,module,exports){
+},{"./NodeType":22,"./XMLNode":44}],42:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLAttribute, XMLElement, XMLNamedNodeMap, XMLNode, getValue, isFunction, isObject,
@@ -23312,7 +23796,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./Utility":22,"./XMLAttribute":24,"./XMLNamedNodeMap":42,"./XMLNode":43}],42:[function(require,module,exports){
+},{"./NodeType":22,"./Utility":23,"./XMLAttribute":25,"./XMLNamedNodeMap":43,"./XMLNode":44}],43:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   // Represents a map of nodes accessed by a string key
@@ -23391,7 +23875,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{}],43:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var DocumentPosition, NodeType, XMLCData, XMLComment, XMLDeclaration, XMLDocType, XMLDummy, XMLElement, XMLNamedNodeMap, XMLNode, XMLNodeList, XMLProcessingInstruction, XMLRaw, XMLText, getValue, isEmpty, isFunction, isObject,
@@ -24392,7 +24876,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./DocumentPosition":20,"./NodeType":21,"./Utility":22,"./XMLCData":25,"./XMLComment":27,"./XMLDeclaration":36,"./XMLDocType":37,"./XMLDummy":40,"./XMLElement":41,"./XMLNamedNodeMap":42,"./XMLNodeList":44,"./XMLProcessingInstruction":45,"./XMLRaw":46,"./XMLText":50}],44:[function(require,module,exports){
+},{"./DocumentPosition":21,"./NodeType":22,"./Utility":23,"./XMLCData":26,"./XMLComment":28,"./XMLDeclaration":37,"./XMLDocType":38,"./XMLDummy":41,"./XMLElement":42,"./XMLNamedNodeMap":43,"./XMLNodeList":45,"./XMLProcessingInstruction":46,"./XMLRaw":47,"./XMLText":51}],45:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   // Represents a list of nodes
@@ -24439,7 +24923,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{}],45:[function(require,module,exports){
+},{}],46:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLCharacterData, XMLProcessingInstruction;
@@ -24497,7 +24981,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./XMLCharacterData":26}],46:[function(require,module,exports){
+},{"./NodeType":22,"./XMLCharacterData":27}],47:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLNode, XMLRaw;
@@ -24539,7 +25023,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./XMLNode":43}],47:[function(require,module,exports){
+},{"./NodeType":22,"./XMLNode":44}],48:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, WriterState, XMLStreamWriter, XMLWriterBase,
@@ -24750,7 +25234,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./WriterState":23,"./XMLWriterBase":51}],48:[function(require,module,exports){
+},{"./NodeType":22,"./WriterState":24,"./XMLWriterBase":52}],49:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var XMLStringWriter, XMLWriterBase;
@@ -24792,7 +25276,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./XMLWriterBase":51}],49:[function(require,module,exports){
+},{"./XMLWriterBase":52}],50:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   // Converts values to strings
@@ -25085,7 +25569,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{}],50:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, XMLCharacterData, XMLText;
@@ -25169,7 +25653,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./XMLCharacterData":26}],51:[function(require,module,exports){
+},{"./NodeType":22,"./XMLCharacterData":27}],52:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, WriterState, XMLCData, XMLComment, XMLDTDAttList, XMLDTDElement, XMLDTDEntity, XMLDTDNotation, XMLDeclaration, XMLDocType, XMLDummy, XMLElement, XMLProcessingInstruction, XMLRaw, XMLText, XMLWriterBase, assign,
@@ -25656,7 +26140,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./Utility":22,"./WriterState":23,"./XMLCData":25,"./XMLComment":27,"./XMLDTDAttList":32,"./XMLDTDElement":33,"./XMLDTDEntity":34,"./XMLDTDNotation":35,"./XMLDeclaration":36,"./XMLDocType":37,"./XMLDummy":40,"./XMLElement":41,"./XMLProcessingInstruction":45,"./XMLRaw":46,"./XMLText":50}],52:[function(require,module,exports){
+},{"./NodeType":22,"./Utility":23,"./WriterState":24,"./XMLCData":26,"./XMLComment":28,"./XMLDTDAttList":33,"./XMLDTDElement":34,"./XMLDTDEntity":35,"./XMLDTDNotation":36,"./XMLDeclaration":37,"./XMLDocType":38,"./XMLDummy":41,"./XMLElement":42,"./XMLProcessingInstruction":46,"./XMLRaw":47,"./XMLText":51}],53:[function(require,module,exports){
 // Generated by CoffeeScript 2.4.1
 (function() {
   var NodeType, WriterState, XMLDOMImplementation, XMLDocument, XMLDocumentCB, XMLStreamWriter, XMLStringWriter, assign, isFunction;
@@ -25778,14 +26262,7 @@ process.umask = function() { return 0; };
 
 }).call(this);
 
-},{"./NodeType":21,"./Utility":22,"./WriterState":23,"./XMLDOMImplementation":30,"./XMLDocument":38,"./XMLDocumentCB":39,"./XMLStreamWriter":47,"./XMLStringWriter":48}],53:[function(require,module,exports){
-const aylienKey = '0865acd424msh0e9b3b15f686f2cp1a5795jsna12cf4567171';
-const azureKey = 'c7803c77aa1445e588c4cc554e228ea6';
-
-exports.aylienKey = aylienKey;
-exports.azureKey = azureKey;
-
-},{}],54:[function(require,module,exports){
+},{"./NodeType":22,"./Utility":23,"./WriterState":24,"./XMLDOMImplementation":31,"./XMLDocument":39,"./XMLDocumentCB":40,"./XMLStreamWriter":48,"./XMLStringWriter":49}],54:[function(require,module,exports){
 const popper = require('@popperjs/core');
 
 window.jQuery = require('jquery');
@@ -25798,7 +26275,7 @@ const xmlbuilder = require('xmlbuilder');
 require('datejs');
 require('jquery-contextmenu');
 const isURL = require('is-url');
-const { azureKey, aylienKey } = require('./api_keys');
+const { azureKey, aylienKey } = require('../../app.config');
 
 const getWordCountFromScript = (script) => {
   const regex = /\b(\w+)\b/g;
@@ -26654,4 +27131,4 @@ $(() => {
   controller.init();
 });
 
-},{"./api_keys":53,"@popperjs/core":1,"datejs":2,"humanize-duration":15,"is-url":16,"jquery":18,"jquery-contextmenu":17,"xmlbuilder":52}]},{},[54]);
+},{"../../app.config":1,"@popperjs/core":2,"datejs":3,"humanize-duration":16,"is-url":17,"jquery":19,"jquery-contextmenu":18,"xmlbuilder":53}]},{},[54]);
