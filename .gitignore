@@ -1,2 +1,3 @@
 node_modules/
 src/js/api_keys.js
+dist/

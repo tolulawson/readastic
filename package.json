@@ -17,7 +17,7 @@
   "bugs": {
     "url": "https://github.com/tolulawson/starter/issues"
   },
-  "homepage": "https://github.com/tolulawson/starter#readme",
+  "homepage": ".",
   "devDependencies": {
     "@babel/core": "^7.10.5",
     "@babel/preset-env": "^7.10.2",
