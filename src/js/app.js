@@ -35,15 +35,15 @@ const fetchArticleBody = (url) => new Promise((resolve) => {
   const settings = {
     async: true,
     crossDomain: true,
-    url: 'https://aylien-text.p.rapidapi.com/extract',
+    url: `https://lexper.p.rapidapi.com/v1.1/extract?media=0&url=${encodeURI(url)}`,
     method: 'GET',
     headers: {
-      'x-rapidapi-host': 'aylien-text.p.rapidapi.com',
+      'x-rapidapi-host': 'lexper.p.rapidapi.com',
       'x-rapidapi-key': aylienKey,
     },
-    data: {
-      url,
-    },
+    // data: {
+    //   url,
+    // },
   };
 
   if (aylienKey) {
@@ -691,7 +691,7 @@ $(() => {
     },
 
     updatePlaybackSpeed(speed) {
-      if(this.audio.length) {
+      if (this.audio.length) {
         playWidgetView.audio[0].playbackRate = speed;
       }
     },
@@ -820,7 +820,7 @@ $(() => {
           if (isURL(controller.getTextContent())) {
             fetchArticleBody(controller.getTextContent())
               .then((response) => {
-                const text = response.article;
+                const { text } = response.article;
                 controller.storeArticleText(response);
                 processTextAndGetAudio(text);
               });
