@@ -26314,6 +26314,7 @@ const fetchArticleBody = (url) => new Promise((resolve) => {
   if (aylienKey) {
     $.ajax(settings)
       .done((response) => {
+        console.log(response);
         resolve(response);
       });
   } else {
@@ -26951,7 +26952,7 @@ $(() => {
     storeArticleText(article) {
       model.fetchedArticle = {
         heading: article.title,
-        body: article.article,
+        body: article.text,
       };
     },
 
@@ -27086,7 +27087,7 @@ $(() => {
             fetchArticleBody(controller.getTextContent())
               .then((response) => {
                 const { text } = response.article;
-                controller.storeArticleText(response);
+                controller.storeArticleText(response.article);
                 processTextAndGetAudio(text);
               });
           } else {
