@@ -1,4 +1,4 @@
 module.exports = {
-  aylienKey: '<%= aylienKey %>',
+  rapidapiKey: '<%= rapidapiKey %>',
   azureKey: '<%= azureKey %>',
 };

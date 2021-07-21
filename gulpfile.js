@@ -28,7 +28,7 @@ gulp.task('dev_env', function() {
 gulp.task('config', function() {
   return gulp.src('app.config.tmpl.js')
     .pipe(template({
-      aylienKey: process.env.aylienKey,
+      rapidapiKey: process.env.rapidapiKey,
       azureKey: process.env.azureKey,
     }))
     .pipe(rename('app.config.js'))
