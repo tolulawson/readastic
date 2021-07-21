@@ -19,136 +19,134 @@ function promisifyStream(stream) {
   return new Promise((resolve) => stream.on('end', resolve));
 }
 
-gulp.task('dev_env', function() {
+gulp.task('dev_env', () => new Promise((resolve, reject) => {
   env({
     file: '.env',
   });
+  resolve();
+}));
+
+gulp.task('config', async () => {
+  await promisifyStream(
+    gulp.src('app.config.tmpl.js')
+      .pipe(template({
+        rapidapiKey: process.env.rapidapiKey,
+        azureKey: process.env.azureKey,
+      }))
+      .pipe(rename('app.config.js'))
+      .pipe(gulp.dest('./')),
+  );
 });
 
-gulp.task('config', function() {
-  return gulp.src('app.config.tmpl.js')
-    .pipe(template({
-      rapidapiKey: process.env.rapidapiKey,
-      azureKey: process.env.azureKey,
-    }))
-    .pipe(rename('app.config.js'))
-    .pipe(gulp.dest('./'));
-});
+gulp.task('copy', () => gulp.src('src/favicon.ico')
+  .pipe(gulp.dest('dist')));
 
-gulp.task('copy', function() {
-  return gulp.src('src/favicon.ico')
-      .pipe(gulp.dest('dist'));
-})
+gulp.task('browserify', () => browserify('src/js/app.js', { sourceType: module })
+  .bundle()
+// Pass desired output filename to vinyl-source-stream
+  .pipe(source('bundle.js'))
+// Start piping stream to tasks!
+  .pipe(gulp.dest('src/js/')));
 
-gulp.task('browserify', function() {
-  return browserify('src/js/app.js', {sourceType: module})
-    .bundle()
-    //Pass desired output filename to vinyl-source-stream
-    .pipe(source('bundle.js'))
-    // Start piping stream to tasks!
-    .pipe(gulp.dest('src/js/'));
-})
-
-gulp.task('sass', async function() {
+gulp.task('sass', async () => {
   await promisifyStream(
     gulp.src('src/scss/*.scss')
-        .pipe(sass(
-          {
-            ouputStyle: 'compressed',
-          }).on('error', sass.logError))
-        .pipe(gulp.dest('src/css'))
-  )
-});
-
-gulp.task('start-sass', function() {
-  return gulp.src('src/scss/*.scss')
-        .pipe(sass({
+      .pipe(sass(
+        {
           ouputStyle: 'compressed',
-      }).on('error', sass.logError))
-        .pipe(gulp.dest('src/css'))
-        .pipe(browsersync.stream())
+        },
+      ).on('error', sass.logError))
+      .pipe(gulp.dest('src/css')),
+  );
 });
 
-gulp.task('cleancss', async function() {
+gulp.task('start-sass', () => gulp.src('src/scss/*.scss')
+  .pipe(sass({
+    ouputStyle: 'compressed',
+  }).on('error', sass.logError))
+  .pipe(gulp.dest('src/css'))
+  .pipe(browsersync.stream()));
+
+gulp.task('cleancss', async () => {
   await promisifyStream(
     gulp.src('src/css/*.css')
-      .pipe(cleancss({compatibility: 'ie8'}))
-      .pipe(gulp.dest('dist/css'))
-  )
-})
-
-gulp.task('autoprefixer', async function() {
-  await promisifyStream(
-      gulp.src('src/css/*.css', {base: './'})
-        .pipe(autoprefixer('last 2 versions'))
-        .pipe(gulp.dest('./'))
-  )
+      .pipe(cleancss({ compatibility: 'ie8' }))
+      .pipe(gulp.dest('dist/css')),
+  );
 });
 
-gulp.task('babel', async function() {
+gulp.task('autoprefixer', async () => {
+  await promisifyStream(
+    gulp.src('src/css/*.css', { base: './' })
+      .pipe(autoprefixer('last 2 versions'))
+      .pipe(gulp.dest('./')),
+  );
+});
+
+gulp.task('babel', async () => {
   await promisifyStream(
     gulp.src('src/js/bundle.js')
       .pipe(babel({
-          presets: [
+        presets: [
           ['@babel/env', {
-            modules: false
-          }]
-        ]
+            modules: false,
+          }],
+        ],
       }))
-      .pipe(gulp.dest('dist/js'))
-  )
-})
+      .pipe(gulp.dest('dist/js')),
+  );
+});
 
-gulp.task('uglify', async function() {
+gulp.task('uglify', async () => {
   await promisifyStream(
-    gulp.src('dist/js/*.js', {base: './'})
+    gulp.src('dist/js/*.js', { base: './' })
       // .pipe(sourcemaps.init())
       .pipe(uglify())
       // .pipe(sourcemaps.write('maps'))
-      .pipe(gulp.dest('./'))
-  )
-})
+      .pipe(gulp.dest('./')),
+  );
+});
 
-gulp.task('htmlmin', async function() {
+gulp.task('htmlmin', async () => {
   await promisifyStream(
     gulp.src('src/**/*.html')
       .pipe(htmlmin({ collapseWhitespace: true }))
-      .pipe(gulp.dest('dist'))
-  )
-})
+      .pipe(gulp.dest('dist')),
+  );
+});
 
-gulp.task('image', async function () {
+gulp.task('image', async () => {
   await promisifyStream(
     gulp.src('src/img/*')
-    .pipe(image())
-    .pipe(gulp.dest('dist/img'))
-  )
+      .pipe(image())
+      .pipe(gulp.dest('dist/img')),
+  );
 });
 
-gulp.task('reload', function (done) {
-    browsersync.reload();
-    done();
+gulp.task('reload', (done) => {
+  browsersync.reload();
+  done();
 });
 
-gulp.task('tests', async function() {
-    gulp
-        .src('src/js/app.js')
-        .pipe(jasmineBrowser.specRunner())
-        .pipe(jasmineBrowser.server({ port: 3001 }));
+gulp.task('tests', async () => {
+  gulp
+    .src('src/js/app.js')
+    .pipe(jasmineBrowser.specRunner())
+    .pipe(jasmineBrowser.server({ port: 3001 }));
 });
 
-gulp.task('start', async function() {
+gulp.task('start', async () => {
   (gulp.parallel('dev_env', 'config'))();
   browsersync.init({
-      server:  {
-        baseDir : "src"
-      }
+    server: {
+      baseDir: 'src',
+    },
   });
-  gulp.watch('src/scss/*.scss', {ignoreInitial: false}, gulp.series('start-sass'));
+  gulp.watch('src/scss/*.scss', { ignoreInitial: false }, gulp.series('start-sass'));
 
-  gulp.watch(['src/*.html', 'src/js/*.js', '!src/js/bundle.js'], {ignoreInitial: false},  gulp.series('browserify', 'reload'));
-})
+  gulp.watch(['src/*.html', 'src/js/*.js', '!src/js/bundle.js'], { ignoreInitial: false }, gulp.series('browserify', 'reload'));
+});
 
-gulp.task('build', async function() {
-  (gulp.series('sass', 'autoprefixer', 'cleancss', 'config', 'babel', 'browserify', 'uglify', 'htmlmin', 'image', 'copy'))();
+gulp.task('build', async () => {
+  (gulp.series('dev_env', 'sass', 'autoprefixer', 'cleancss', 'config', 'browserify', 'babel', 'browserify', 'uglify', 'htmlmin', 'image', 'copy'))();
 });
