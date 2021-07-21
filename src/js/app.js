@@ -10,7 +10,7 @@ const xmlbuilder = require('xmlbuilder');
 require('datejs');
 require('jquery-contextmenu');
 const isURL = require('is-url');
-const { azureKey, aylienKey } = require('../../app.config');
+const { azureKey, rapidapiKey } = require('../../app.config');
 
 const getWordCountFromScript = (script) => {
   const regex = /\b(\w+)\b/g;
@@ -39,14 +39,14 @@ const fetchArticleBody = (url) => new Promise((resolve) => {
     method: 'GET',
     headers: {
       'x-rapidapi-host': 'lexper.p.rapidapi.com',
-      'x-rapidapi-key': aylienKey,
+      'x-rapidapi-key': rapidapiKey,
     },
     // data: {
     //   url,
     // },
   };
 
-  if (aylienKey) {
+  if (rapidapiKey) {
     $.ajax(settings)
       .done((response) => {
         resolve(response);
