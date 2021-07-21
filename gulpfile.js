@@ -10,7 +10,6 @@ const cleancss = require('gulp-clean-css');
 const jasmineBrowser = require('gulp-jasmine-browser');
 const browserify = require('browserify');
 const source = require('vinyl-source-stream');
-const babelify = require('babelify');
 const env = require('gulp-env');
 const template = require('gulp-template');
 const rename = require('gulp-rename');
