@@ -147,5 +147,5 @@ gulp.task('start', async () => {
 });
 
 gulp.task('build', async () => {
-  (gulp.series('dev_env', 'sass', 'autoprefixer', 'cleancss', 'config', 'browserify', 'babel', 'browserify', 'uglify', 'htmlmin', 'image', 'copy'))();
+  (gulp.series('sass', 'autoprefixer', 'cleancss', 'config', 'browserify', 'babel', 'browserify', 'uglify', 'htmlmin', 'image', 'copy'))();
 });
