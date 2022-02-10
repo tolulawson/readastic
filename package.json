@@ -42,7 +42,7 @@
     "gulp-uglify": "^3.0.2",
     "jasmine": "^3.5.0",
     "js-yaml": "^3.13.1",
-    "node-sass": "^4.14.1",
+    "node-sass": "^7.0.0",
     "vinyl-source-stream": "^2.0.0"
   },
   "dependencies": {
